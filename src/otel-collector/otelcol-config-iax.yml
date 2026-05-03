@@ -1,0 +1,217 @@
+# OTel Collector configuration for IAX integration.
+# All telemetry (traces, metrics, logs) is forwarded to an IAX instance
+# via OTLP/gRPC. No local observability backends are used.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${env:OTEL_COLLECTOR_HOST}:${env:OTEL_COLLECTOR_PORT_GRPC}
+      http:
+        endpoint: ${env:OTEL_COLLECTOR_HOST}:${env:OTEL_COLLECTOR_PORT_HTTP}
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+  httpcheck/frontend-proxy:
+    targets:
+      - endpoint: http://${env:FRONTEND_PROXY_ADDR}
+  nginx:
+    endpoint: http://${env:IMAGE_PROVIDER_HOST}:${env:IMAGE_PROVIDER_PORT}/status
+    collection_interval: 10s
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    api_version: "1.44"
+  kafkametrics:
+    scrapers:
+      - brokers
+      - topics
+      - consumers
+    brokers:
+      - ${KAFKA_ADDR}
+    collection_interval: 10s
+  postgresql:
+    endpoint: ${POSTGRES_HOST}:${POSTGRES_PORT}
+    username: monitoring_user
+    password: ${env:POSTGRES_MONITORING_PASSWORD}
+    metrics:
+      postgresql.blks_hit:
+        enabled: true
+      postgresql.blks_read:
+        enabled: true
+      postgresql.tup_fetched:
+        enabled: true
+      postgresql.tup_returned:
+        enabled: true
+      postgresql.tup_inserted:
+        enabled: true
+      postgresql.tup_updated:
+        enabled: true
+      postgresql.tup_deleted:
+        enabled: true
+      postgresql.deadlocks:
+        enabled: true
+    tls:
+      insecure: true
+  redis:
+    endpoint: "valkey-cart:6379"
+    username: "valkey"
+    collection_interval: 10s
+  hostmetrics:
+    root_path: /hostfs
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+          system.cpu.logical.count:
+            enabled: true
+      disk:
+      load:
+      filesystem:
+        exclude_mount_points:
+          mount_points:
+            - /dev/*
+            - /proc/*
+            - /sys/*
+            - /run/k3s/containerd/*
+            - /var/lib/docker/*
+            - /var/lib/kubelet/*
+            - /snap/*
+          match_type: regexp
+        exclude_fs_types:
+          fs_types:
+            - autofs
+            - binfmt_misc
+            - bpf
+            - cgroup2
+            - configfs
+            - debugfs
+            - devpts
+            - devtmpfs
+            - fusectl
+            - hugetlbfs
+            - iso9660
+            - mqueue
+            - nsfs
+            - overlay
+            - proc
+            - procfs
+            - pstore
+            - rpc_pipefs
+            - securityfs
+            - selinuxfs
+            - squashfs
+            - sysfs
+            - tracefs
+          match_type: strict
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+          system.memory.limit:
+            enabled: true
+      network:
+      paging:
+        metrics:
+          system.paging.usage:
+            enabled: true
+      processes:
+      process:
+        mute_process_exe_error: true
+        mute_process_io_error: true
+        mute_process_user_error: true
+      system:
+        metrics:
+          system.uptime:
+            enabled: true
+
+exporters:
+  debug:
+  otlp_grpc/iax:
+    endpoint: ${env:IAX_OTLP_ENDPOINT}
+    tls:
+      insecure: ${env:IAX_OTLP_INSECURE}
+    headers:
+      x-iax-source: "opentelemetry-demo"
+      otel-client-username: ${env:IAX_INGESTION_USERNAME}
+      otel-client-password: ${env:IAX_INGESTION_PASSWORD}
+    sending_queue:
+      batch:
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  resourcedetection:
+    detectors: [env, docker, system]
+  transform/sanitize_spans:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(span.attributes["http.route"], "/api/cart") where
+            span.kind == SPAN_KIND_SERVER and
+            resource.attributes["service.name"] == "frontend" and
+            span.attributes["http.route"] == nil and
+            IsMatch(span.attributes["http.target"], "\\/api\\/cart")
+
+          - set(span.attributes["http.route"], "/api/checkout") where
+            span.kind == SPAN_KIND_SERVER and
+            resource.attributes["service.name"] == "frontend" and
+            span.attributes["http.route"] == nil and
+            IsMatch(span.attributes["http.target"], "\\/api\\/checkout")
+
+          - set(span.attributes["http.route"], "/api/products/{productId}") where
+            span.kind == SPAN_KIND_SERVER and
+            resource.attributes["service.name"] == "frontend" and
+            span.attributes["http.route"] == nil and
+            IsMatch(span.attributes["http.target"], "\\/api\\/products\\/.*")
+
+          - set(span.attributes["http.route"], "/api/recommendations") where
+            span.kind == SPAN_KIND_SERVER and
+            resource.attributes["service.name"] == "frontend" and
+            span.attributes["http.route"] == nil and
+            IsMatch(span.attributes["http.target"], "\\/api\\/recommendations")
+
+          - set(span.attributes["http.route"], "/api/data") where
+            span.kind == SPAN_KIND_SERVER and
+            resource.attributes["service.name"] == "frontend" and
+            span.attributes["http.route"] == nil and
+            IsMatch(span.attributes["http.target"], "\\/api\\/data.*")
+
+          - set_semconv_span_name("1.37.0", "original_span_name")
+
+connectors:
+  spanmetrics:
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, memory_limiter, transform/sanitize_spans]
+      exporters: [otlp_grpc/iax, debug, spanmetrics]
+    metrics:
+      receivers: [docker_stats, httpcheck/frontend-proxy, hostmetrics, nginx, otlp, postgresql, redis, spanmetrics, kafkametrics]
+      processors: [resourcedetection, memory_limiter]
+      exporters: [otlp_grpc/iax, debug]
+    logs:
+      receivers: [otlp]
+      processors: [resourcedetection, memory_limiter]
+      exporters: [otlp_grpc/iax, debug]
+  telemetry:
+    metrics:
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://${env:OTEL_COLLECTOR_HOST}:${env:OTEL_COLLECTOR_PORT_HTTP}
+    logs:
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://${env:OTEL_COLLECTOR_HOST}:${env:OTEL_COLLECTOR_PORT_HTTP}

@@ -1,0 +1,54 @@
+# Minimal OTel Collector config for standalone docker run usage.
+# Receives OTLP from apps and forwards to IAX. No infrastructure
+# receivers (Kafka, PostgreSQL, Redis, Docker, host metrics).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+
+exporters:
+  debug:
+  otlp_grpc/iax:
+    endpoint: ${env:IAX_OTLP_ENDPOINT}
+    tls:
+      insecure: ${env:IAX_OTLP_INSECURE}
+    headers:
+      x-iax-source: "opentelemetry-demo"
+      otel-client-username: ${env:IAX_INGESTION_USERNAME}
+      otel-client-password: ${env:IAX_INGESTION_PASSWORD}
+    sending_queue:
+      batch:
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  resourcedetection:
+    detectors: [env]
+
+connectors:
+  spanmetrics:
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, memory_limiter]
+      exporters: [otlp_grpc/iax, debug, spanmetrics]
+    metrics:
+      receivers: [otlp, spanmetrics]
+      processors: [resourcedetection, memory_limiter]
+      exporters: [otlp_grpc/iax, debug]
+    logs:
+      receivers: [otlp]
+      processors: [resourcedetection, memory_limiter]
+      exporters: [otlp_grpc/iax, debug]

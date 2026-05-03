@@ -54,6 +54,7 @@ composer.lock
 
 # Otel Demo specific
 docker-compose.override.yml
+.env.iax.local
 
 src/frontend/cypress/videos
 src/frontend/cypress/screenshots

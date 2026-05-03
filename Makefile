@@ -254,3 +254,47 @@ endif
 .PHONY: build-react-native-android
 build-react-native-android:
 	docker build -f src/react-native-app/android.Dockerfile --platform=linux/amd64 --output=. src/react-native-app
+
+# ****************************
+# IAX Integration Targets
+# ****************************
+# .env.iax.local holds credentials and per-user overrides (gitignored).
+# Create an empty one if it doesn't exist so docker compose doesn't error.
+.env.iax.local:
+	@touch .env.iax.local
+
+DOCKER_COMPOSE_IAX_ENV=--env-file .env --env-file .env.iax --env-file .env.iax.local
+
+# Build all demo images for IAX (tagged for Nexus)
+.PHONY: iax-build
+iax-build: .env.iax.local
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_COMPOSE_IAX_ENV) -f docker-compose.iax.yml build
+
+# Build and push all demo images to Nexus
+.PHONY: iax-push
+iax-push: .env.iax.local
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_COMPOSE_IAX_ENV) -f docker-compose.iax.yml build --push
+
+# Start the demo with telemetry flowing to IAX
+# Set IAX_OTLP_ENDPOINT and credentials in .env.iax.local
+.PHONY: iax-start
+iax-start: .env.iax.local
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_COMPOSE_IAX_ENV) -f docker-compose.iax.yml up --force-recreate --remove-orphans --detach
+	@echo ""
+	@echo "OpenTelemetry Demo (IAX) is running."
+	@echo "Go to http://localhost:8080 for the demo UI."
+	@echo "Go to http://localhost:8080/loadgen/ for the Load Generator UI."
+	@echo ""
+	@echo "All telemetry is being sent to IAX at: $${IAX_OTLP_ENDPOINT:-[check .env.iax.local]}"
+
+# Stop the IAX demo
+.PHONY: iax-stop
+iax-stop: .env.iax.local
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_COMPOSE_IAX_ENV) -f docker-compose.iax.yml down --remove-orphans --volumes
+	@echo ""
+	@echo "OpenTelemetry Demo (IAX) is stopped."
+
+# Pull pre-built images from Nexus (no local build needed)
+.PHONY: iax-pull
+iax-pull: .env.iax.local
+	$(DOCKER_COMPOSE_CMD) $(DOCKER_COMPOSE_IAX_ENV) -f docker-compose.iax.yml pull

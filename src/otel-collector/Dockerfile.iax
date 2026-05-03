@@ -1,0 +1,5 @@
+FROM ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.146.1
+
+COPY otelcol-config-iax.yml /etc/otelcol-config.yml
+COPY otelcol-config-extras.yml /etc/otelcol-config-extras.yml
+COPY otelcol-config-iax-standalone.yml /etc/otelcol-config-standalone.yml
