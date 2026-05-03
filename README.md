@@ -100,7 +100,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-otel-collector \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.0 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -119,7 +119,7 @@ docker run -d --name frontend --network host \
   -e OTEL_SERVICE_NAME=frontend \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e PORT=8080 \
-  docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-frontend
+  docker.itrsgroup.com/iax-otel-demo/frontend:1.0.0
 ```
 
 **Step 3 — Start the load generator** (drives traffic through the frontend):
@@ -133,7 +133,7 @@ docker run -d --name load-generator --network host \
   -e LOCUST_WEB_PORT=8089 \
   -e LOCUST_AUTOSTART=true \
   -e LOCUST_HOST=http://localhost:8080 \
-  docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-load-generator
+  docker.itrsgroup.com/iax-otel-demo/load-generator:1.0.0
 ```
 
 The load generator UI is at `http://localhost:8089`.
@@ -168,7 +168,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-otel-collector \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.0 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -227,13 +227,13 @@ docker login docker.itrsgroup.com
 make iax-push
 ```
 
-Images are tagged as `docker.itrsgroup.com/iax-otel-demo/otel-demo:<version>-<service>`,
+Each service is a separate image under `docker.itrsgroup.com/iax-otel-demo/`,
 for example:
 
-- `docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-frontend`
-- `docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-checkout`
-- `docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-otel-collector`
-- `docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-load-generator`
+- `docker.itrsgroup.com/iax-otel-demo/frontend:1.0.0`
+- `docker.itrsgroup.com/iax-otel-demo/checkout:1.0.0`
+- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.0`
+- `docker.itrsgroup.com/iax-otel-demo/load-generator:1.0.0`
 
 ### Makefile targets
 
@@ -260,8 +260,8 @@ and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 | `IAX_OTLP_INSECURE`      | `false`                              | Set to `true` only for non-TLS dev endpoints           |
 | `IAX_INGESTION_USERNAME` | *(empty)*                            | IAX ingestion credential username (gRPC metadata auth) |
 | `IAX_INGESTION_PASSWORD` | *(empty)*                            | IAX ingestion credential password                      |
-| `IMAGE_NAME`             | `docker.itrsgroup.com/iax-otel-demo/otel-demo` | Nexus registry + image name                            |
-| `VERSION`                | `1.0.0`                              | Image version tag (e.g. `otel-demo:1.0.0-frontend`)    |
+| `IMAGE_REGISTRY`         | `docker.itrsgroup.com/iax-otel-demo` | Nexus registry path (each service is a separate image) |
+| `VERSION`                | `1.0.0`                              | Image version tag (e.g. `frontend:1.0.0`)              |
 
 
 ---
@@ -401,6 +401,6 @@ docker compose -f docker-compose.iax.yml down --remove-orphans --volumes
 **Clean up images:**
 
 ```bash
-docker images --format "{{.Repository}}:{{.Tag}}" | grep "iax/otel-demo" | xargs docker rmi
+docker images --format "{{.Repository}}:{{.Tag}}" | grep "iax-otel-demo/" | xargs docker rmi
 ```
 
