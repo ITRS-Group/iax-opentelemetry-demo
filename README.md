@@ -68,10 +68,12 @@ without `Unauthenticated` or `connection refused` errors.
 
 **Access the demo:**
 
-| URL | Description |
-|---|---|
-| `http://localhost:8080` | Storefront — browse products, add to cart, checkout |
+
+| URL                              | Description                                         |
+| -------------------------------- | --------------------------------------------------- |
+| `http://localhost:8080`          | Storefront — browse products, add to cart, checkout |
 | `http://localhost:8080/loadgen/` | Load generator UI — adjust synthetic traffic volume |
+
 
 The load generator starts automatically, so traces, metrics, and logs flow
 to IAX as soon as the services are healthy (~30 seconds after start).
@@ -98,7 +100,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax/otel-demo:1.0.0-otel-collector \
+  docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-otel-collector \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -117,7 +119,7 @@ docker run -d --name frontend --network host \
   -e OTEL_SERVICE_NAME=frontend \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e PORT=8080 \
-  docker.itrsgroup.com/iax/otel-demo:1.0.0-frontend
+  docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-frontend
 ```
 
 **Step 3 — Start the load generator** (drives traffic through the frontend):
@@ -131,7 +133,7 @@ docker run -d --name load-generator --network host \
   -e LOCUST_WEB_PORT=8089 \
   -e LOCUST_AUTOSTART=true \
   -e LOCUST_HOST=http://localhost:8080 \
-  docker.itrsgroup.com/iax/otel-demo:1.0.0-load-generator
+  docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-load-generator
 ```
 
 The load generator UI is at `http://localhost:8089`.
@@ -166,7 +168,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax/otel-demo:1.0.0-otel-collector \
+  docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-otel-collector \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -191,7 +193,7 @@ forwards everything to IAX.
 
 ---
 
-## Publishing
+## Building/Testing/Publishing
 
 Build, test, and push images to Nexus. Requires a checkout of this repository.
 
@@ -225,22 +227,25 @@ docker login docker.itrsgroup.com
 make iax-push
 ```
 
-Images are tagged as `docker.itrsgroup.com/iax/otel-demo:<version>-<service>`,
+Images are tagged as `docker.itrsgroup.com/iax-otel-demo/otel-demo:<version>-<service>`,
 for example:
-- `docker.itrsgroup.com/iax/otel-demo:1.0.0-frontend`
-- `docker.itrsgroup.com/iax/otel-demo:1.0.0-checkout`
-- `docker.itrsgroup.com/iax/otel-demo:1.0.0-otel-collector`
-- `docker.itrsgroup.com/iax/otel-demo:1.0.0-load-generator`
+
+- `docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-frontend`
+- `docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-checkout`
+- `docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-otel-collector`
+- `docker.itrsgroup.com/iax-otel-demo/otel-demo:1.0.0-load-generator`
 
 ### Makefile targets
 
-| Target | Description |
-|---|---|
-| `make iax-build` | Build all demo images tagged for Nexus |
-| `make iax-push` | Build and push all images to Nexus |
-| `make iax-pull` | Pull pre-built images from Nexus |
+
+| Target           | Description                             |
+| ---------------- | --------------------------------------- |
+| `make iax-build` | Build all demo images tagged for Nexus  |
+| `make iax-push`  | Build and push all images to Nexus      |
+| `make iax-pull`  | Pull pre-built images from Nexus        |
 | `make iax-start` | Start the demo (telemetry flows to IAX) |
-| `make iax-stop` | Stop the demo and clean up |
+| `make iax-stop`  | Stop the demo and clean up              |
+
 
 ### Configuration
 
@@ -248,14 +253,16 @@ Defaults live in `.env.iax` (tracked in git, no secrets). Per-user overrides
 and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 — `.env.iax.local` values override `.env.iax`.
 
-| Variable | Default | Description |
-|---|---|---|
-| `IAX_OTLP_ENDPOINT` | `iax-ingestion.example.com:443` | IAX Ingestion Service OTLP/gRPC address (host:port) |
-| `IAX_OTLP_INSECURE` | `false` | Set to `true` only for non-TLS dev endpoints |
-| `IAX_INGESTION_USERNAME` | *(empty)* | IAX ingestion credential username (gRPC metadata auth) |
-| `IAX_INGESTION_PASSWORD` | *(empty)* | IAX ingestion credential password |
-| `IMAGE_NAME` | `docker.itrsgroup.com/iax/otel-demo` | Nexus registry + image name |
-| `VERSION` | `1.0.0` | Image version tag (e.g. `otel-demo:1.0.0-frontend`) |
+
+| Variable                 | Default                              | Description                                            |
+| ------------------------ | ------------------------------------ | ------------------------------------------------------ |
+| `IAX_OTLP_ENDPOINT`      | `iax-ingestion.example.com:443`      | IAX Ingestion Service OTLP/gRPC address (host:port)    |
+| `IAX_OTLP_INSECURE`      | `false`                              | Set to `true` only for non-TLS dev endpoints           |
+| `IAX_INGESTION_USERNAME` | *(empty)*                            | IAX ingestion credential username (gRPC metadata auth) |
+| `IAX_INGESTION_PASSWORD` | *(empty)*                            | IAX ingestion credential password                      |
+| `IMAGE_NAME`             | `docker.itrsgroup.com/iax-otel-demo/otel-demo` | Nexus registry + image name                            |
+| `VERSION`                | `1.0.0`                              | Image version tag (e.g. `otel-demo:1.0.0-frontend`)    |
+
 
 ---
 
@@ -291,34 +298,36 @@ and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 The OTel Collector forwards all three signal types:
 
 - **Traces** — distributed traces across all 15+ microservices (Go, Java, .NET,
-  Python, Rust, Node.js, C++, PHP, Ruby)
+Python, Rust, Node.js, C++, PHP, Ruby)
 - **Metrics** — application metrics, host metrics, Docker stats, Kafka metrics,
-  PostgreSQL metrics, Redis/Valkey metrics, HTTP checks, span metrics
+PostgreSQL metrics, Redis/Valkey metrics, HTTP checks, span metrics
 - **Logs** — application logs from all services
 
 All data is tagged with `service.namespace=iax-otel-demo` for easy filtering in IAX.
 
 ## Services
 
-| Service | Language | Telemetry |
-|---|---|---|
-| accounting | .NET | Traces, Metrics |
-| ad | Java | Traces, Metrics, Logs |
-| cart | .NET | Traces, Metrics |
-| checkout | Go | Traces, Metrics |
-| currency | C++ | Traces, Metrics |
-| email | Ruby | Traces, Metrics |
-| fraud-detection | Java/Kotlin | Traces, Metrics |
-| frontend | Node.js | Traces, Metrics |
-| frontend-proxy | Envoy | Traces, Metrics |
-| image-provider | Nginx | Metrics |
-| load-generator | Python/Locust | Traces, Metrics |
-| payment | Node.js | Traces, Metrics |
-| product-catalog | Go | Traces, Metrics, Logs |
-| product-reviews | Python | Traces, Metrics, Logs |
-| quote | PHP | Traces, Metrics |
-| recommendation | Python | Traces, Metrics, Logs |
-| shipping | Rust | Traces, Metrics |
+
+| Service         | Language      | Telemetry             |
+| --------------- | ------------- | --------------------- |
+| accounting      | .NET          | Traces, Metrics       |
+| ad              | Java          | Traces, Metrics, Logs |
+| cart            | .NET          | Traces, Metrics       |
+| checkout        | Go            | Traces, Metrics       |
+| currency        | C++           | Traces, Metrics       |
+| email           | Ruby          | Traces, Metrics       |
+| fraud-detection | Java/Kotlin   | Traces, Metrics       |
+| frontend        | Node.js       | Traces, Metrics       |
+| frontend-proxy  | Envoy         | Traces, Metrics       |
+| image-provider  | Nginx         | Metrics               |
+| load-generator  | Python/Locust | Traces, Metrics       |
+| payment         | Node.js       | Traces, Metrics       |
+| product-catalog | Go            | Traces, Metrics, Logs |
+| product-reviews | Python        | Traces, Metrics, Logs |
+| quote           | PHP           | Traces, Metrics       |
+| recommendation  | Python        | Traces, Metrics, Logs |
+| shipping        | Rust          | Traces, Metrics       |
+
 
 ## What to Expect in IAX
 
@@ -326,13 +335,13 @@ Once the demo is running and the collector is exporting successfully, data
 appears in IAX within 1–2 minutes:
 
 - **Traces** — distributed traces spanning multiple services (e.g., a checkout
-  request touches `frontend` → `checkout` → `payment` → `shipping` → `email`).
-  Filter by `service.namespace = iax-otel-demo` to isolate demo traffic.
+request touches `frontend` → `checkout` → `payment` → `shipping` → `email`).
+Filter by `service.namespace = iax-otel-demo` to isolate demo traffic.
 - **Metrics** — application-level metrics (request counts, latencies, error
-  rates) plus infrastructure metrics (host, Docker stats, Kafka, PostgreSQL,
-  Valkey). Span metrics are auto-generated from traces.
+rates) plus infrastructure metrics (host, Docker stats, Kafka, PostgreSQL,
+Valkey). Span metrics are auto-generated from traces.
 - **Logs** — application logs from services that emit them (`ad`,
-  `product-catalog`, `product-reviews`, `recommendation`).
+`product-catalog`, `product-reviews`, `recommendation`).
 
 If you don't see data after 2 minutes, check the collector logs and refer to
 the Troubleshooting section below.
@@ -345,13 +354,13 @@ the Troubleshooting section below.
 docker logs otel-collector -f
 ```
 
-**`Unauthenticated` errors:**
+`**Unauthenticated` errors:**
 The collector logs show `rpc error: code = Unauthenticated`. Check that
 `IAX_INGESTION_USERNAME` and `IAX_INGESTION_PASSWORD` are set correctly. For
 Docker Compose, verify they are in `.env.iax.local`. For `docker run`, check
 the `-e` flags.
 
-**`connection refused` errors:**
+`**connection refused` errors:**
 The IAX endpoint is unreachable. Verify the hostname and port in
 `IAX_OTLP_ENDPOINT`. If IAX is on a remote Kubernetes cluster, you may need
 a port-forward:
@@ -365,7 +374,7 @@ kubectl port-forward svc/iax-ingestion 443:443 -n iax
 Set `IAX_OTLP_INSECURE=true` if your IAX endpoint does not use TLS (e.g., a
 local dev instance). Production endpoints should always use TLS (`false`).
 
-**`docker compose` not found:**
+`**docker compose` not found:**
 You need Docker Compose V2 (the `docker compose` plugin), not the standalone
 `docker-compose` v1. Install it:
 
@@ -394,3 +403,4 @@ docker compose -f docker-compose.iax.yml down --remove-orphans --volumes
 ```bash
 docker images --format "{{.Repository}}:{{.Tag}}" | grep "iax/otel-demo" | xargs docker rmi
 ```
+
