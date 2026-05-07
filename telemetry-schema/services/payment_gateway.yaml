@@ -3,7 +3,7 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.payment
+  - id: service.payment_gateway
     visibility: public
     brief: Payment service attributes
     stability: stable

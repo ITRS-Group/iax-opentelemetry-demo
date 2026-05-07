@@ -17,7 +17,7 @@ metrics:
     unit: "{recommendation}"
     stability: stable
     annotations:
-      service: recommendation
+      service: ops-recommendation
     attributes:
       - ref: recommendation.type
         requirement_level: required

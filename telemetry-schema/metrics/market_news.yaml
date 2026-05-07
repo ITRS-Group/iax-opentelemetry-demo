@@ -9,7 +9,7 @@ metrics:
     unit: "{ad_request}"
     stability: stable
     annotations:
-      service: ad
+      service: market-news
     attributes:
       - ref: app.ads.ad_request_type
         requirement_level: required

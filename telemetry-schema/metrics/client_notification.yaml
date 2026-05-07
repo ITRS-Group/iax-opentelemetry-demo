@@ -10,4 +10,4 @@ metrics:
     stability: stable
     note: Counts the number of confirmation emails sent
     annotations:
-      service: email
+      service: client-notification

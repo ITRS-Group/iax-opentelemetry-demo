@@ -3,10 +3,10 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.currency
+  - id: service.simulated_market_activity
     visibility: public
-    brief: Currency service attributes
+    brief: Load Generator baggage attributes
     stability: stable
     attributes:
-      - ref: app.currency.conversion.from
-      - ref: app.currency.conversion.to
+      - ref: session.id
+      - ref: app.synthetic_request

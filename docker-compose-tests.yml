@@ -12,8 +12,8 @@ services:
   # *****
   # Frontend Tests
   frontendTests:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-frontend-tests
-    container_name: frontend-tests
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-client-transaction-portal-tests
+    container_name: client-transaction-portal-tests
     build:
       context: ./
       dockerfile: ./src/frontend/Dockerfile.cypress
@@ -25,7 +25,7 @@ services:
       - FRONTEND_ADDR
       - NODE_ENV=production
     depends_on:
-      - frontend
+      - client-transaction-portal
 
   # Tracebased Tests
   traceBasedTests:
@@ -58,39 +58,39 @@ services:
       tracetest-server:
         condition: service_healthy
       # adding demo services as dependencies
-      accounting:
+      ledger-booking:
         condition: service_started
-      ad:
+      market-news:
         condition: service_started
-      cart:
+      transaction-staging:
         condition: service_started
-      checkout:
+      payment-orchestration:
         condition: service_started
-      currency:
+      fx-rate:
         condition: service_started
-      email:
+      client-notification:
         condition: service_started
-      fraud-detection:
+      risk-compliance:
         condition: service_started
-      frontend:
+      client-transaction-portal:
         condition: service_started
       llm:
         condition: service_started
-      payment:
+      payment-gateway:
         condition: service_started
-      product-catalog:
+      reference-data:
         condition: service_started
-      product-reviews:
+      transaction-audit:
         condition: service_started
-      quote:
+      pricing-quote:
         condition: service_started
-      recommendation:
+      ops-recommendation:
         condition: service_started
-      shipping:
+      settlement:
         condition: service_started
-      flagd:
+      incident-control:
         condition: service_started
-      kafka:
+      transaction-event-stream:
         condition: service_started
 
   tracetest-server:

@@ -3,7 +3,7 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.recommendation
+  - id: service.ops_recommendation
     visibility: public
     brief: Recommendation service attributes
     stability: stable

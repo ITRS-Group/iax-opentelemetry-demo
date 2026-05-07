@@ -100,7 +100,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.0 \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.1 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -111,29 +111,29 @@ docker logs otel-collector --tail 5
 # Look for: "Everything is ready. Begin running and processing data."
 ```
 
-**Step 2 — Start a demo service** (example: frontend on port 8080):
+**Step 2 — Start a demo service** (example: client-transaction-portal on port 8080):
 
 ```bash
-docker run -d --name frontend --network host \
+docker run -d --name client-transaction-portal --network host \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
-  -e OTEL_SERVICE_NAME=frontend \
+  -e OTEL_SERVICE_NAME=client-transaction-portal \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e PORT=8080 \
-  docker.itrsgroup.com/iax-otel-demo/frontend:1.0.0
+  docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.1
 ```
 
-**Step 3 — Start the load generator** (drives traffic through the frontend):
+**Step 3 — Start the load generator** (drives traffic through the client-transaction-portal):
 
 ```bash
-docker run -d --name load-generator --network host \
+docker run -d --name simulated-market-activity --network host \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
-  -e OTEL_SERVICE_NAME=load-generator \
+  -e OTEL_SERVICE_NAME=simulated-market-activity \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e LOCUST_WEB_HOST=0.0.0.0 \
   -e LOCUST_WEB_PORT=8089 \
   -e LOCUST_AUTOSTART=true \
   -e LOCUST_HOST=http://localhost:8080 \
-  docker.itrsgroup.com/iax-otel-demo/load-generator:1.0.0
+  docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.1
 ```
 
 The load generator UI is at `http://localhost:8089`.
@@ -148,7 +148,7 @@ docker logs otel-collector --tail 10
 **Step 5 — Clean up:**
 
 ```bash
-docker rm -f otel-collector frontend load-generator
+docker rm -f otel-collector client-transaction-portal simulated-market-activity
 ```
 
 > **Note:** In this mode, only the services you start will generate telemetry.
@@ -168,7 +168,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.0 \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.1 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -230,10 +230,10 @@ make iax-push
 Each service is a separate image under `docker.itrsgroup.com/iax-otel-demo/`,
 for example:
 
-- `docker.itrsgroup.com/iax-otel-demo/frontend:1.0.0`
-- `docker.itrsgroup.com/iax-otel-demo/checkout:1.0.0`
-- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.0`
-- `docker.itrsgroup.com/iax-otel-demo/load-generator:1.0.0`
+- `docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.1`
+- `docker.itrsgroup.com/iax-otel-demo/payment-orchestration:1.0.1`
+- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.1`
+- `docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.1`
 
 ### Makefile targets
 
@@ -261,7 +261,7 @@ and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 | `IAX_INGESTION_USERNAME` | *(empty)*                            | IAX ingestion credential username (gRPC metadata auth) |
 | `IAX_INGESTION_PASSWORD` | *(empty)*                            | IAX ingestion credential password                      |
 | `IMAGE_REGISTRY`         | `docker.itrsgroup.com/iax-otel-demo` | Nexus registry path (each service is a separate image) |
-| `VERSION`                | `1.0.0`                              | Image version tag (e.g. `frontend:1.0.0`)              |
+| `VERSION`                | `1.0.1`                              | Image version tag (e.g. `client-transaction-portal:1.0.1`)              |
 
 
 ---
@@ -273,7 +273,9 @@ and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 │  Docker Compose (otel-demo-iax network)                     │
 │                                                             │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │ frontend │ │ checkout │ │ payment  │ │   cart   │  ...   │
+│  │ client-     │ │ payment-     │ │ payment- │ │ transaction-│       │
+│  │ transaction-│ │ orchestr-   │ │ gateway  │ │ staging     │       │
+│  │ portal      │ │ ation       │ │          │ │             │  ...  │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘       │
 │       │             │            │             │             │
 │       └─────────────┴────────────┴─────────────┘             │
@@ -310,23 +312,23 @@ All data is tagged with `service.namespace=iax-otel-demo` for easy filtering in 
 
 | Service         | Language      | Telemetry             |
 | --------------- | ------------- | --------------------- |
-| accounting      | .NET          | Traces, Metrics       |
-| ad              | Java          | Traces, Metrics, Logs |
-| cart            | .NET          | Traces, Metrics       |
-| checkout        | Go            | Traces, Metrics       |
-| currency        | C++           | Traces, Metrics       |
-| email           | Ruby          | Traces, Metrics       |
-| fraud-detection | Java/Kotlin   | Traces, Metrics       |
-| frontend        | Node.js       | Traces, Metrics       |
-| frontend-proxy  | Envoy         | Traces, Metrics       |
-| image-provider  | Nginx         | Metrics               |
-| load-generator  | Python/Locust | Traces, Metrics       |
-| payment         | Node.js       | Traces, Metrics       |
-| product-catalog | Go            | Traces, Metrics, Logs |
-| product-reviews | Python        | Traces, Metrics, Logs |
-| quote           | PHP           | Traces, Metrics       |
-| recommendation  | Python        | Traces, Metrics, Logs |
-| shipping        | Rust          | Traces, Metrics       |
+| ledger-booking      | .NET          | Traces, Metrics       |
+| market-news              | Java          | Traces, Metrics, Logs |
+| transaction-staging            | .NET          | Traces, Metrics       |
+| payment-orchestration        | Go            | Traces, Metrics       |
+| fx-rate        | C++           | Traces, Metrics       |
+| client-notification           | Ruby          | Traces, Metrics       |
+| risk-compliance | Java/Kotlin   | Traces, Metrics       |
+| client-transaction-portal        | Node.js       | Traces, Metrics       |
+| transaction-api-gateway  | Envoy         | Traces, Metrics       |
+| document-imaging  | Nginx         | Metrics               |
+| simulated-market-activity  | Python/Locust | Traces, Metrics       |
+| payment-gateway         | Node.js       | Traces, Metrics       |
+| reference-data | Go            | Traces, Metrics, Logs |
+| transaction-audit | Python        | Traces, Metrics, Logs |
+| pricing-quote           | PHP           | Traces, Metrics       |
+| ops-recommendation  | Python        | Traces, Metrics, Logs |
+| settlement        | Rust          | Traces, Metrics       |
 
 
 ## What to Expect in IAX
@@ -335,13 +337,13 @@ Once the demo is running and the collector is exporting successfully, data
 appears in IAX within 1–2 minutes:
 
 - **Traces** — distributed traces spanning multiple services (e.g., a checkout
-request touches `frontend` → `checkout` → `payment` → `shipping` → `email`).
+request touches `client-transaction-portal` → `payment-orchestration` → `payment-gateway` → `settlement` → `client-notification`).
 Filter by `service.namespace = iax-otel-demo` to isolate demo traffic.
 - **Metrics** — application-level metrics (request counts, latencies, error
 rates) plus infrastructure metrics (host, Docker stats, Kafka, PostgreSQL,
 Valkey). Span metrics are auto-generated from traces.
-- **Logs** — application logs from services that emit them (`ad`,
-`product-catalog`, `product-reviews`, `recommendation`).
+- **Logs** — application logs from services that emit them (`market-news`,
+`reference-data`, `transaction-audit`, `ops-recommendation`).
 
 If you don't see data after 2 minutes, check the collector logs and refer to
 the Troubleshooting section below.
@@ -385,11 +387,11 @@ sudo apt install docker-compose-plugin   # Debian/Ubuntu with Docker's apt repo
 Verify with `docker compose version` — it should report v2.x.x or later.
 
 **Container name conflicts:**
-If you see `The container name "/frontend" is already in use`, remove the
+If you see `The container name "/client-transaction-portal" is already in use`, remove the
 stale container first:
 
 ```bash
-docker rm -f frontend
+docker rm -f client-transaction-portal
 ```
 
 To remove all demo containers at once (Docker Compose):

@@ -3,10 +3,10 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.quote
+  - id: service.client_notification
     visibility: public
-    brief: Quote service attributes
+    brief: Email service attributes
     stability: stable
     attributes:
-      - ref: app.quote.items.count
-      - ref: app.quote.cost.total
+      - ref: app.order.id
+      - ref: app.email.recipient

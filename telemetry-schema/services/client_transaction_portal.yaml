@@ -3,9 +3,10 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.shipping
+  - id: service.client_transaction_portal
     visibility: public
-    brief: Shipping service attributes
+    brief: Frontend service attributes
     stability: stable
     attributes:
-      - ref: app.shipping.cost.total
+      - ref: app.synthetic_request
+      - ref: session.id

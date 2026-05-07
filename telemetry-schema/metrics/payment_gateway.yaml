@@ -17,7 +17,7 @@ metrics:
     unit: "{transaction}"
     stability: stable
     annotations:
-      service: payment
+      service: payment-gateway-gateway
     attributes:
       - ref: app.payment.currency
         requirement_level: required

@@ -3,7 +3,7 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.checkout
+  - id: service.payment_orchestration
     visibility: public
     brief: Checkout service attributes
     stability: stable

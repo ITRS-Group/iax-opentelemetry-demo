@@ -64,7 +64,6 @@ builder.Services.AddSingleton(x =>
 
 Action<ResourceBuilder> appResourceBuilder =
     resource => resource
-        .AddService(builder.Environment.ApplicationName)
         .AddContainerDetector()
         .AddHostDetector();
 

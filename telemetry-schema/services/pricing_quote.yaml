@@ -3,10 +3,10 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.frontend
+  - id: service.pricing_quote
     visibility: public
-    brief: Frontend service attributes
+    brief: Quote service attributes
     stability: stable
     attributes:
-      - ref: app.synthetic_request
-      - ref: session.id
+      - ref: app.quote.items.count
+      - ref: app.quote.cost.total

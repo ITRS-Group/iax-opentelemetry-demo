@@ -3,12 +3,12 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.cart
+  - id: service.transaction_audit
     visibility: public
-    brief: Cart service attributes
+    brief: Product Reviews service attributes
     stability: stable
     attributes:
-      - ref: app.user.id
       - ref: app.product.id
-      - ref: app.product.quantity
-      - ref: app.cart.items.count
+      - ref: app.product_reviews.count
+      - ref: app.product_reviews.average_score
+      - ref: app.product.question

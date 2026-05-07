@@ -3,12 +3,12 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.product_catalog
+  - id: service.transaction_staging
     visibility: public
-    brief: Product Catalog service attributes
+    brief: Cart service attributes
     stability: stable
     attributes:
-      - ref: app.products.count
+      - ref: app.user.id
       - ref: app.product.id
-      - ref: app.product.name
-      - ref: app.products_search.count
+      - ref: app.product.quantity
+      - ref: app.cart.items.count

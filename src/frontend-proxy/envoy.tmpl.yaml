@@ -33,7 +33,7 @@ static_resources:
                 route_config:
                   name: local_route
                   virtual_hosts:
-                    - name: frontend
+                    - name: client-transaction-portal
                       domains:
                         - "*"
                       routes:
@@ -54,19 +54,19 @@ static_resources:
                         - match: { path: "/telemetry" }
                           redirect: { path_redirect: "/telemetry/" }
                         - match: { prefix: "/telemetry/" }
-                          route: { cluster: telemetry-docs, prefix_rewrite: "/" }
+                          route: { cluster: observability-docs, prefix_rewrite: "/" }
                         - match: { prefix: "/images/" }
-                          route: { cluster: image-provider, prefix_rewrite: "/" }
+                          route: { cluster: document-imaging, prefix_rewrite: "/" }
                         - match: { prefix: "/flagservice/" }
                           route: { cluster: flagservice, prefix_rewrite: "/", timeout: 0s }
                         - match: { prefix: "/feature" }
                           route:
-                            cluster: flagd-ui
+                            cluster: incident-control-ui
                             prefix_rewrite: "/"
                             upgrade_configs:
                               - upgrade_type: websocket
                         - match: { prefix: "/" }  # Default/catch-all route - keep last since prefix:"/" matches everything
-                          route: { cluster: frontend }
+                          route: { cluster: client-transaction-portal }
                 http_filters:
                   - name: envoy.filters.http.fault
                     typed_config:
@@ -162,11 +162,11 @@ static_resources:
                     socket_address:
                       address: ${OTEL_COLLECTOR_HOST}
                       port_value: ${OTEL_COLLECTOR_PORT_HTTP}
-    - name: frontend
+    - name: client-transaction-portal
       type: STRICT_DNS
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: frontend
+        cluster_name: client-transaction-portal
         endpoints:
           - lb_endpoints:
               - endpoint:
@@ -174,11 +174,11 @@ static_resources:
                     socket_address:
                       address: ${FRONTEND_HOST}
                       port_value: ${FRONTEND_PORT}
-    - name: image-provider
+    - name: document-imaging
       type: STRICT_DNS
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: image-provider
+        cluster_name: document-imaging
         endpoints:
           - lb_endpoints:
               - endpoint:
@@ -198,11 +198,11 @@ static_resources:
                     socket_address:
                       address: ${FLAGD_HOST}
                       port_value: ${FLAGD_PORT}
-    - name: flagd-ui
+    - name: incident-control-ui
       type: STRICT_DNS
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: flagd-ui
+        cluster_name: incident-control-ui
         endpoints:
           - lb_endpoints:
               - endpoint:
@@ -246,11 +246,11 @@ static_resources:
                     socket_address:
                       address: ${JAEGER_HOST}
                       port_value: ${JAEGER_UI_PORT}
-    - name: telemetry-docs
+    - name: observability-docs
       type: STRICT_DNS
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: telemetry-docs
+        cluster_name: observability-docs
         endpoints:
           - lb_endpoints:
               - endpoint:

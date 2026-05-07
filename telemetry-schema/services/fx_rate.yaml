@@ -3,10 +3,10 @@
 
 file_format: definition/2
 attribute_groups:
-  - id: service.email
+  - id: service.fx_rate
     visibility: public
-    brief: Email service attributes
+    brief: Currency service attributes
     stability: stable
     attributes:
-      - ref: app.order.id
-      - ref: app.email.recipient
+      - ref: app.currency.conversion.from
+      - ref: app.currency.conversion.to

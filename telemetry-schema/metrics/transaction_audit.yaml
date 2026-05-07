@@ -17,7 +17,7 @@ metrics:
     unit: "{review_request}"
     stability: stable
     annotations:
-      service: product_reviews
+      service: transaction-audit
     attributes:
       - ref: product.id
         requirement_level: required
@@ -29,7 +29,7 @@ metrics:
     unit: "{ai_request}"
     stability: stable
     annotations:
-      service: product_reviews
+      service: transaction-audit
     attributes:
       - ref: product.id
         requirement_level: required
