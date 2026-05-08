@@ -20,6 +20,7 @@ exporters:
     endpoint: ${env:IAX_OTLP_ENDPOINT}
     tls:
       insecure: ${env:IAX_OTLP_INSECURE}
+      insecure_skip_verify: ${env:IAX_OTLP_INSECURE_SKIP_VERIFY}
     headers:
       x-iax-source: "opentelemetry-demo"
       otel-client-username: ${env:IAX_INGESTION_USERNAME}
