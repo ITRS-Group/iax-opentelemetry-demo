@@ -98,9 +98,10 @@ docker login docker.itrsgroup.com
 docker run -d --name otel-collector --network host \
   -e IAX_OTLP_ENDPOINT=your-iax-host:443 \
   -e IAX_OTLP_INSECURE=false \
+  -e IAX_OTLP_INSECURE_SKIP_VERIFY=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.1 \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -119,7 +120,7 @@ docker run -d --name client-transaction-portal --network host \
   -e OTEL_SERVICE_NAME=client-transaction-portal \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e PORT=8080 \
-  docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.1
+  docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.2
 ```
 
 **Step 3 — Start the load generator** (drives traffic through the client-transaction-portal):
@@ -133,7 +134,7 @@ docker run -d --name simulated-market-activity --network host \
   -e LOCUST_WEB_PORT=8089 \
   -e LOCUST_AUTOSTART=true \
   -e LOCUST_HOST=http://localhost:8080 \
-  docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.1
+  docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.2
 ```
 
 The load generator UI is at `http://localhost:8089`.
@@ -166,9 +167,10 @@ collector and configure your app to export to it.
 docker run -d --name otel-collector --network host \
   -e IAX_OTLP_ENDPOINT=your-iax-host:443 \
   -e IAX_OTLP_INSECURE=false \
+  -e IAX_OTLP_INSECURE_SKIP_VERIFY=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.1 \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -230,10 +232,10 @@ make iax-push
 Each service is a separate image under `docker.itrsgroup.com/iax-otel-demo/`,
 for example:
 
-- `docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.1`
-- `docker.itrsgroup.com/iax-otel-demo/payment-orchestration:1.0.1`
-- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.1`
-- `docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.1`
+- `docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.2`
+- `docker.itrsgroup.com/iax-otel-demo/payment-orchestration:1.0.2`
+- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2`
+- `docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.2`
 
 ### Makefile targets
 
@@ -258,10 +260,11 @@ and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 | ------------------------ | ------------------------------------ | ------------------------------------------------------ |
 | `IAX_OTLP_ENDPOINT`      | `iax-ingestion.example.com:443`      | IAX Ingestion Service OTLP/gRPC address (host:port)    |
 | `IAX_OTLP_INSECURE`      | `false`                              | Set to `true` only for non-TLS dev endpoints           |
+| `IAX_OTLP_INSECURE_SKIP_VERIFY` | `false`                       | Set to `true` to skip TLS certificate verification (self-signed certs) |
 | `IAX_INGESTION_USERNAME` | *(empty)*                            | IAX ingestion credential username (gRPC metadata auth) |
 | `IAX_INGESTION_PASSWORD` | *(empty)*                            | IAX ingestion credential password                      |
 | `IMAGE_REGISTRY`         | `docker.itrsgroup.com/iax-otel-demo` | Nexus registry path (each service is a separate image) |
-| `VERSION`                | `1.0.1`                              | Image version tag (e.g. `client-transaction-portal:1.0.1`)              |
+| `VERSION`                | `1.0.2`                              | Image version tag (e.g. `client-transaction-portal:1.0.2`)              |
 
 
 ---
@@ -373,8 +376,11 @@ kubectl port-forward svc/iax-ingestion 443:443 -n iax
 ```
 
 **TLS / certificate errors:**
-Set `IAX_OTLP_INSECURE=true` if your IAX endpoint does not use TLS (e.g., a
-local dev instance). Production endpoints should always use TLS (`false`).
+If the collector logs show `x509: certificate signed by unknown authority`, set
+`IAX_OTLP_INSECURE_SKIP_VERIFY=true` to skip certificate verification (e.g.,
+for endpoints using self-signed certificates). Set `IAX_OTLP_INSECURE=true`
+only if your IAX endpoint does not use TLS at all (e.g., a local dev instance).
+Production endpoints should always use TLS with `IAX_OTLP_INSECURE=false`.
 
 `**docker compose` not found:**
 You need Docker Compose V2 (the `docker compose` plugin), not the standalone
