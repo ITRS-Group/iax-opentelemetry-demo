@@ -110,7 +110,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE_SKIP_VERIFY=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2 \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.3 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -121,29 +121,29 @@ docker logs otel-collector --tail 5
 # Look for: "Everything is ready. Begin running and processing data."
 ```
 
-**Step 2 — Start a demo service** (example: client-transaction-portal on port 8080):
+**Step 2 — Start a demo service** (example: trader-order-entry on port 8080):
 
 ```bash
-docker run -d --name client-transaction-portal --network host \
+docker run -d --name trader-order-entry --network host \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
-  -e OTEL_SERVICE_NAME=client-transaction-portal \
+  -e OTEL_SERVICE_NAME=trader-order-entry \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e PORT=8080 \
-  docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.2
+  docker.itrsgroup.com/iax-otel-demo/trader-order-entry:1.0.3
 ```
 
-**Step 3 — Start the load generator** (drives traffic through the client-transaction-portal):
+**Step 3 — Start the load generator** (drives traffic through the trader-order-entry):
 
 ```bash
-docker run -d --name simulated-market-activity --network host \
+docker run -d --name simulated-fix-order-flow --network host \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
-  -e OTEL_SERVICE_NAME=simulated-market-activity \
+  -e OTEL_SERVICE_NAME=simulated-fix-order-flow \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e LOCUST_WEB_HOST=0.0.0.0 \
   -e LOCUST_WEB_PORT=8089 \
   -e LOCUST_AUTOSTART=true \
   -e LOCUST_HOST=http://localhost:8080 \
-  docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.2
+  docker.itrsgroup.com/iax-otel-demo/simulated-fix-order-flow:1.0.3
 ```
 
 The load generator UI is at `http://localhost:8089`.
@@ -158,7 +158,7 @@ docker logs otel-collector --tail 10
 **Step 5 — Clean up:**
 
 ```bash
-docker rm -f otel-collector client-transaction-portal simulated-market-activity
+docker rm -f otel-collector trader-order-entry simulated-fix-order-flow
 ```
 
 > **Note:** In this mode, only the services you start will generate telemetry.
@@ -179,7 +179,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE_SKIP_VERIFY=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2 \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.3 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -271,7 +271,7 @@ kubectl logs deploy/iax-demo-otel-collector --tail 20
 **Access the demo** (without Ingress):
 
 ```bash
-kubectl port-forward svc/transaction-api-gateway 8080:8080
+kubectl port-forward svc/fix-api-gateway 8080:8080
 # Open http://localhost:8080
 ```
 
@@ -286,7 +286,7 @@ helm uninstall iax-demo
 | Value | Default | Description |
 | ----- | ------- | ----------- |
 | `global.imageRegistry` | `docker.itrsgroup.com/iax-otel-demo` | Container image registry |
-| `global.imageTag` | `1.0.2` | Image tag for all demo services |
+| `global.imageTag` | `1.0.3` | Image tag for all demo services |
 | `global.imagePullSecrets` | `[]` | Pull secrets for private registries |
 | `iax.otlpEndpoint` | `iax-ingestion.example.com:443` | IAX OTLP/gRPC endpoint |
 | `iax.otlpInsecure` | `false` | Disable TLS (dev only) |
@@ -341,10 +341,10 @@ make iax-push
 Each service is a separate image under `docker.itrsgroup.com/iax-otel-demo/`,
 for example:
 
-- `docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.2`
-- `docker.itrsgroup.com/iax-otel-demo/payment-orchestration:1.0.2`
-- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2`
-- `docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.2`
+- `docker.itrsgroup.com/iax-otel-demo/trader-order-entry:1.0.3`
+- `docker.itrsgroup.com/iax-otel-demo/order-routing:1.0.3`
+- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.3`
+- `docker.itrsgroup.com/iax-otel-demo/simulated-fix-order-flow:1.0.3`
 
 ### Makefile targets
 
@@ -373,7 +373,7 @@ and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 | `IAX_INGESTION_USERNAME` | *(empty)*                            | IAX ingestion credential username (gRPC metadata auth) |
 | `IAX_INGESTION_PASSWORD` | *(empty)*                            | IAX ingestion credential password                      |
 | `IMAGE_REGISTRY`         | `docker.itrsgroup.com/iax-otel-demo` | Nexus registry path (each service is a separate image) |
-| `VERSION`                | `1.0.2`                              | Image version tag (e.g. `client-transaction-portal:1.0.2`)              |
+| `VERSION`                | `1.0.3`                              | Image version tag (e.g. `trader-order-entry:1.0.3`)              |
 
 
 ### Helm chart
@@ -419,10 +419,10 @@ iax:
   ingestionPassword: "your-password"
 
 global:
-  imageTag: "1.0.2"
+  imageTag: "1.0.3"
 
 components:
-  simulated-market-activity:
+  simulated-fix-order-flow:
     enabled: false   # disable load generator during testing
 ```
 
@@ -463,23 +463,23 @@ and `appVersion` (image tag) as needed.
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Docker Compose (otel-demo-iax network)                     │
-│                                                             │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │ client-     │ │ payment-     │ │ payment- │ │ transaction-│       │
-│  │ transaction-│ │ orchestr-   │ │ gateway  │ │ staging     │       │
-│  │ portal      │ │ ation       │ │          │ │             │  ...  │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘       │
-│       │             │            │             │             │
-│       └─────────────┴────────────┴─────────────┘             │
-│                          │                                   │
-│                ┌─────────▼──────────┐                        │
-│                │   OTel Collector   │                        │
-│                │  (otelcol-contrib)  │                        │
-│                └─────────┬──────────┘                        │
-│                          │ OTLP/gRPC                         │
-└──────────────────────────┼───────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Docker Compose / Kubernetes                                  │
+│                                                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
+│  │ trader-  │ │ order-   │ │ execution│ │ order-   │        │
+│  │ order-   │ │ routing  │ │ -venue-  │ │ staging  │  ...   │
+│  │ entry    │ │          │ │ adapter  │ │          │        │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘        │
+│       │             │            │             │              │
+│       └─────────────┴────────────┴─────────────┘              │
+│                          │                                    │
+│                ┌─────────▼──────────┐                         │
+│                │   OTel Collector   │                         │
+│                │  (otelcol-contrib)  │                         │
+│                └─────────┬──────────┘                         │
+│                          │ OTLP/gRPC                          │
+└──────────────────────────┼────────────────────────────────────┘
                            │
                            ▼
                 ┌─────────────────────┐
@@ -504,25 +504,25 @@ All data is tagged with `service.namespace=iax-otel-demo` for easy filtering in 
 ## Services
 
 
-| Service         | Language      | Telemetry             |
-| --------------- | ------------- | --------------------- |
-| ledger-booking      | .NET          | Traces, Metrics       |
-| market-news              | Java          | Traces, Metrics, Logs |
-| transaction-staging            | .NET          | Traces, Metrics       |
-| payment-orchestration        | Go            | Traces, Metrics       |
-| fx-rate        | C++           | Traces, Metrics       |
-| client-notification           | Ruby          | Traces, Metrics       |
-| risk-compliance | Java/Kotlin   | Traces, Metrics       |
-| client-transaction-portal        | Node.js       | Traces, Metrics       |
-| transaction-api-gateway  | Envoy         | Traces, Metrics       |
-| document-imaging  | Nginx         | Metrics               |
-| simulated-market-activity  | Python/Locust | Traces, Metrics       |
-| payment-gateway         | Node.js       | Traces, Metrics       |
-| reference-data | Go            | Traces, Metrics, Logs |
-| transaction-audit | Python        | Traces, Metrics, Logs |
-| pricing-quote           | PHP           | Traces, Metrics       |
-| ops-recommendation  | Python        | Traces, Metrics, Logs |
-| settlement        | Rust          | Traces, Metrics       |
+| Service                    | Language      | Telemetry             |
+| -------------------------- | ------------- | --------------------- |
+| trade-capture              | .NET          | Traces, Metrics       |
+| market-news                | Java          | Traces, Metrics, Logs |
+| order-staging              | .NET          | Traces, Metrics       |
+| order-routing              | Go            | Traces, Metrics       |
+| fx-rates                   | C++           | Traces, Metrics       |
+| trade-notifications        | Ruby          | Traces, Metrics       |
+| pre-trade-risk             | Java/Kotlin   | Traces, Metrics       |
+| trader-order-entry         | Node.js       | Traces, Metrics       |
+| fix-api-gateway            | Envoy         | Traces, Metrics       |
+| trade-documents            | Nginx         | Metrics               |
+| simulated-fix-order-flow   | Python/Locust | Traces, Metrics       |
+| execution-venue-adapter    | Node.js       | Traces, Metrics       |
+| instrument-reference-data  | Go            | Traces, Metrics, Logs |
+| trade-audit                | Python        | Traces, Metrics, Logs |
+| market-data-quotes         | PHP           | Traces, Metrics       |
+| smart-order-recommendation | Python        | Traces, Metrics, Logs |
+| settlement-instructions    | Rust          | Traces, Metrics       |
 
 
 ## What to Expect in IAX
@@ -531,13 +531,13 @@ Once the demo is running and the collector is exporting successfully, data
 appears in IAX within 1–2 minutes:
 
 - **Traces** — distributed traces spanning multiple services (e.g., a checkout
-request touches `client-transaction-portal` → `payment-orchestration` → `payment-gateway` → `settlement` → `client-notification`).
+request touches `trader-order-entry` → `order-routing` → `execution-venue-adapter` → `settlement-instructions` → `trade-notifications`).
 Filter by `service.namespace = iax-otel-demo` to isolate demo traffic.
 - **Metrics** — application-level metrics (request counts, latencies, error
 rates) plus infrastructure metrics (host, Docker stats, Kafka, PostgreSQL,
 Valkey). Span metrics are auto-generated from traces.
 - **Logs** — application logs from services that emit them (`market-news`,
-`reference-data`, `transaction-audit`, `ops-recommendation`).
+`instrument-reference-data`, `trade-audit`, `smart-order-recommendation`).
 
 If you don't see data after 2 minutes, check the collector logs and refer to
 the Troubleshooting section below.
@@ -584,11 +584,11 @@ sudo apt install docker-compose-plugin   # Debian/Ubuntu with Docker's apt repo
 Verify with `docker compose version` — it should report v2.x.x or later.
 
 **Container name conflicts:**
-If you see `The container name "/client-transaction-portal" is already in use`, remove the
+If you see `The container name "/trader-order-entry" is already in use`, remove the
 stale container first:
 
 ```bash
-docker rm -f client-transaction-portal
+docker rm -f trader-order-entry
 ```
 
 To remove all demo containers at once (Docker Compose):
@@ -631,10 +631,10 @@ policy blocking egress. The same `Unauthenticated`, `connection refused`, and
 TLS error patterns from the Docker section apply here.
 
 **Disable a service:**
-To disable a specific component (e.g., `simulated-market-activity`):
+To disable a specific component (e.g., `simulated-fix-order-flow`):
 
 ```bash
 helm upgrade iax-demo ./charts/iax-otel-demo/ \
-  --set components.simulated-market-activity.enabled=false
+  --set components.simulated-fix-order-flow.enabled=false
 ```
 

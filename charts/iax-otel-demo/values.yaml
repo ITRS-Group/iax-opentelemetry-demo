@@ -3,7 +3,7 @@
 
 global:
   imageRegistry: docker.itrsgroup.com/iax-otel-demo
-  imageTag: "1.0.2"
+  imageTag: "1.0.3"
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
 
@@ -67,15 +67,15 @@ default:
     - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       value: cumulative
     - name: OTEL_RESOURCE_ATTRIBUTES
-      value: "service.namespace=iax-otel-demo,service.version=1.0.2"
+      value: "service.namespace=iax-otel-demo,service.version=1.0.3"
   envOverrides: []
 
 # ---------------------------------------------------------------------------
 # Demo microservices
 # ---------------------------------------------------------------------------
 components:
-  # -- ledger-booking (.NET) — accounting service
-  ledger-booking:
+  # -- trade-capture (.NET) — accounting service
+  trade-capture:
     enabled: true
     useDefault:
       env: true
@@ -88,9 +88,9 @@ components:
       - name: OTEL_EXPORTER_OTLP_ENDPOINT
         value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
       - name: OTEL_SERVICE_NAME
-        value: ledger-booking
+        value: trade-capture
       - name: KAFKA_ADDR
-        value: "transaction-event-stream:9092"
+        value: "trade-event-stream:9092"
       - name: DB_CONNECTION_STRING
         value: "Host=astronomy-db;Username=astronomy_user;Password=astronomy_password;Database=astronomy_db"
       - name: OTEL_DOTNET_AUTO_TRACES_ENTITYFRAMEWORKCORE_INSTRUMENTATION_ENABLED
@@ -124,8 +124,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=medium"
 
-  # -- transaction-staging (.NET) — cart service
-  transaction-staging:
+  # -- order-staging (.NET) — cart service
+  order-staging:
     enabled: true
     useDefault:
       env: true
@@ -136,7 +136,7 @@ components:
         memory: 160Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: transaction-staging
+        value: order-staging
       - name: CART_PORT
         value: "7070"
       - name: FLAGD_HOST
@@ -150,8 +150,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=high"
 
-  # -- payment-orchestration (Go) — checkout service
-  payment-orchestration:
+  # -- order-routing (Go) — checkout service
+  order-routing:
     enabled: true
     useDefault:
       env: true
@@ -162,7 +162,7 @@ components:
         memory: 20Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: payment-orchestration
+        value: order-routing
       - name: CHECKOUT_PORT
         value: "5050"
       - name: FLAGD_HOST
@@ -170,26 +170,26 @@ components:
       - name: FLAGD_PORT
         value: "8013"
       - name: CART_ADDR
-        value: "transaction-staging:7070"
+        value: "order-staging:7070"
       - name: CURRENCY_ADDR
-        value: "fx-rate:7001"
+        value: "fx-rates:7001"
       - name: EMAIL_ADDR
-        value: "http://client-notification:6060"
+        value: "http://trade-notifications:6060"
       - name: PAYMENT_ADDR
-        value: "payment-gateway:50051"
+        value: "execution-venue-adapter:50051"
       - name: PRODUCT_CATALOG_ADDR
-        value: "reference-data:3550"
+        value: "instrument-reference-data:3550"
       - name: SHIPPING_ADDR
-        value: "http://settlement:50050"
+        value: "http://settlement-instructions:50050"
       - name: KAFKA_ADDR
-        value: "transaction-event-stream:9092"
+        value: "trade-event-stream:9092"
       - name: GOMEMLIMIT
         value: "16MiB"
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=critical"
 
-  # -- fx-rate (C++) — currency service
-  fx-rate:
+  # -- fx-rates (C++) — currency service
+  fx-rates:
     enabled: true
     useDefault:
       env: true
@@ -200,18 +200,18 @@ components:
         memory: 20Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: fx-rate
+        value: fx-rates
       - name: CURRENCY_PORT
         value: "7001"
       - name: IPV6_ENABLED
         value: "false"
       - name: VERSION
-        value: "1.0.2"
+        value: "1.0.3"
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=high"
 
-  # -- client-notification (Ruby) — email service
-  client-notification:
+  # -- trade-notifications (Ruby) — email service
+  trade-notifications:
     enabled: true
     useDefault:
       env: true
@@ -224,7 +224,7 @@ components:
       - name: OTEL_EXPORTER_OTLP_ENDPOINT
         value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
       - name: OTEL_SERVICE_NAME
-        value: client-notification
+        value: trade-notifications
       - name: APP_ENV
         value: production
       - name: EMAIL_PORT
@@ -236,8 +236,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=medium"
 
-  # -- risk-compliance (Java/Kotlin) — fraud-detection service
-  risk-compliance:
+  # -- pre-trade-risk (Java/Kotlin) — fraud-detection service
+  pre-trade-risk:
     enabled: true
     useDefault:
       env: true
@@ -250,13 +250,13 @@ components:
       - name: OTEL_EXPORTER_OTLP_ENDPOINT
         value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
       - name: OTEL_SERVICE_NAME
-        value: risk-compliance
+        value: pre-trade-risk
       - name: FLAGD_HOST
         value: incident-control
       - name: FLAGD_PORT
         value: "8013"
       - name: KAFKA_ADDR
-        value: "transaction-event-stream:9092"
+        value: "trade-event-stream:9092"
       - name: OTEL_INSTRUMENTATION_KAFKA_EXPERIMENTAL_SPAN_ATTRIBUTES
         value: "true"
       - name: OTEL_INSTRUMENTATION_MESSAGING_EXPERIMENTAL_RECEIVE_TELEMETRY_ENABLED
@@ -264,8 +264,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=low"
 
-  # -- client-transaction-portal (Node.js) — frontend
-  client-transaction-portal:
+  # -- trader-order-entry (Node.js) — frontend
+  trader-order-entry:
     enabled: true
     useDefault:
       env: true
@@ -276,27 +276,27 @@ components:
         memory: 250Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: client-transaction-portal
+        value: trader-order-entry
       - name: PORT
         value: "8080"
       - name: FRONTEND_ADDR
-        value: "client-transaction-portal:8080"
+        value: "trader-order-entry:8080"
       - name: AD_ADDR
         value: "market-news:9555"
       - name: CART_ADDR
-        value: "transaction-staging:7070"
+        value: "order-staging:7070"
       - name: CHECKOUT_ADDR
-        value: "payment-orchestration:5050"
+        value: "order-routing:5050"
       - name: CURRENCY_ADDR
-        value: "fx-rate:7001"
+        value: "fx-rates:7001"
       - name: PRODUCT_CATALOG_ADDR
-        value: "reference-data:3550"
+        value: "instrument-reference-data:3550"
       - name: PRODUCT_REVIEWS_ADDR
-        value: "transaction-audit:3551"
+        value: "trade-audit:3551"
       - name: RECOMMENDATION_ADDR
-        value: "ops-recommendation:9001"
+        value: "smart-order-recommendation:9001"
       - name: SHIPPING_ADDR
-        value: "http://settlement:50050"
+        value: "http://settlement-instructions:50050"
       - name: OTEL_COLLECTOR_HOST
         value: '{{ include "iax-otel-demo.name" . }}-otel-collector'
       - name: PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
@@ -312,8 +312,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=critical"
 
-  # -- transaction-api-gateway (Envoy) — frontend proxy
-  transaction-api-gateway:
+  # -- fix-api-gateway (Envoy) — frontend proxy
+  fix-api-gateway:
     enabled: true
     useDefault:
       env: true
@@ -327,19 +327,19 @@ components:
         memory: 65Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: transaction-api-gateway
+        value: fix-api-gateway
       - name: FRONTEND_PORT
         value: "8080"
       - name: FRONTEND_HOST
-        value: client-transaction-portal
+        value: trader-order-entry
       - name: LOCUST_WEB_HOST
-        value: simulated-market-activity
+        value: simulated-fix-order-flow
       - name: LOCUST_WEB_PORT
         value: "8089"
       - name: OTEL_COLLECTOR_HOST
         value: '{{ include "iax-otel-demo.name" . }}-otel-collector'
       - name: IMAGE_PROVIDER_HOST
-        value: document-imaging
+        value: trade-documents
       - name: IMAGE_PROVIDER_PORT
         value: "8081"
       - name: OTEL_COLLECTOR_PORT_GRPC
@@ -375,8 +375,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=critical"
 
-  # -- document-imaging (Nginx) — image provider
-  document-imaging:
+  # -- trade-documents (Nginx) — image provider
+  trade-documents:
     enabled: true
     useDefault:
       env: true
@@ -387,7 +387,7 @@ components:
         memory: 120Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: document-imaging
+        value: trade-documents
       - name: IMAGE_PROVIDER_PORT
         value: "8081"
       - name: OTEL_COLLECTOR_HOST
@@ -397,8 +397,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=low"
 
-  # -- simulated-market-activity (Python/Locust) — load generator
-  simulated-market-activity:
+  # -- simulated-fix-order-flow (Python/Locust) — load generator
+  simulated-fix-order-flow:
     enabled: true
     useDefault:
       env: true
@@ -409,13 +409,13 @@ components:
         memory: 1500Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: simulated-market-activity
+        value: simulated-fix-order-flow
       - name: LOCUST_WEB_PORT
         value: "8089"
       - name: LOCUST_USERS
         value: "5"
       - name: LOCUST_HOST
-        value: "http://transaction-api-gateway:8080"
+        value: "http://fix-api-gateway:8080"
       - name: LOCUST_HEADLESS
         value: "false"
       - name: LOCUST_AUTOSTART
@@ -435,8 +435,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=low"
 
-  # -- payment-gateway (Node.js) — payment service
-  payment-gateway:
+  # -- execution-venue-adapter (Node.js) — payment service
+  execution-venue-adapter:
     enabled: true
     useDefault:
       env: true
@@ -447,7 +447,7 @@ components:
         memory: 140Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: payment-gateway
+        value: execution-venue-adapter
       - name: IPV6_ENABLED
         value: "false"
       - name: PAYMENT_PORT
@@ -459,8 +459,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=critical"
 
-  # -- reference-data (Go) — product catalog service
-  reference-data:
+  # -- instrument-reference-data (Go) — product catalog service
+  instrument-reference-data:
     enabled: true
     useDefault:
       env: true
@@ -471,7 +471,7 @@ components:
         memory: 20Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: reference-data
+        value: instrument-reference-data
       - name: PRODUCT_CATALOG_PORT
         value: "3550"
       - name: FLAGD_HOST
@@ -487,8 +487,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=high"
 
-  # -- transaction-audit (Python) — product reviews service
-  transaction-audit:
+  # -- trade-audit (Python) — product reviews service
+  trade-audit:
     enabled: true
     useDefault:
       env: true
@@ -499,7 +499,7 @@ components:
         memory: 100Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: transaction-audit
+        value: trade-audit
       - name: PRODUCT_REVIEWS_PORT
         value: "3551"
       - name: OTEL_PYTHON_LOG_CORRELATION
@@ -517,7 +517,7 @@ components:
       - name: LLM_MODEL
         value: astronomy-llm
       - name: PRODUCT_CATALOG_ADDR
-        value: "reference-data:3550"
+        value: "instrument-reference-data:3550"
       - name: FLAGD_HOST
         value: incident-control
       - name: FLAGD_PORT
@@ -529,8 +529,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=medium"
 
-  # -- pricing-quote (PHP) — quote service
-  pricing-quote:
+  # -- market-data-quotes (PHP) — quote service
+  market-data-quotes:
     enabled: true
     useDefault:
       env: true
@@ -543,7 +543,7 @@ components:
       - name: OTEL_EXPORTER_OTLP_ENDPOINT
         value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
       - name: OTEL_SERVICE_NAME
-        value: pricing-quote
+        value: market-data-quotes
       - name: IPV6_ENABLED
         value: "false"
       - name: QUOTE_PORT
@@ -555,8 +555,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=low"
 
-  # -- ops-recommendation (Python) — recommendation service
-  ops-recommendation:
+  # -- smart-order-recommendation (Python) — recommendation service
+  smart-order-recommendation:
     enabled: true
     useDefault:
       env: true
@@ -567,11 +567,11 @@ components:
         memory: 500Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: ops-recommendation
+        value: smart-order-recommendation
       - name: RECOMMENDATION_PORT
         value: "9001"
       - name: PRODUCT_CATALOG_ADDR
-        value: "reference-data:3550"
+        value: "instrument-reference-data:3550"
       - name: FLAGD_HOST
         value: incident-control
       - name: FLAGD_PORT
@@ -583,8 +583,8 @@ components:
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=medium"
 
-  # -- settlement (Rust) — shipping service
-  settlement:
+  # -- settlement-instructions (Rust) — shipping service
+  settlement-instructions:
     enabled: true
     useDefault:
       env: true
@@ -595,13 +595,13 @@ components:
         memory: 20Mi
     env:
       - name: OTEL_SERVICE_NAME
-        value: settlement
+        value: settlement-instructions
       - name: IPV6_ENABLED
         value: "false"
       - name: SHIPPING_PORT
         value: "50050"
       - name: QUOTE_ADDR
-        value: "http://pricing-quote:8090"
+        value: "http://market-data-quotes:8090"
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
         value: "service.criticality=high"
 
@@ -640,12 +640,12 @@ components:
       - name: GOMEMLIMIT
         value: "60MiB"
       - name: OTEL_RESOURCE_ATTRIBUTES
-        value: "service.namespace=iax-otel-demo,service.version=1.0.2,service.criticality=low"
+        value: "service.namespace=iax-otel-demo,service.version=1.0.3,service.criticality=low"
       - name: OTEL_SERVICE_NAME
         value: incident-control
 
-  # -- transaction-event-stream — Kafka broker
-  transaction-event-stream:
+  # -- trade-event-stream — Kafka broker
+  trade-event-stream:
     enabled: true
     useDefault:
       env: true
@@ -658,13 +658,13 @@ components:
       - name: OTEL_EXPORTER_OTLP_ENDPOINT
         value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
       - name: OTEL_SERVICE_NAME
-        value: transaction-event-stream
+        value: trade-event-stream
       - name: KAFKA_ADVERTISED_LISTENERS
-        value: "PLAINTEXT://transaction-event-stream:9092"
+        value: "PLAINTEXT://trade-event-stream:9092"
       - name: KAFKA_LISTENERS
-        value: "PLAINTEXT://transaction-event-stream:9092,CONTROLLER://transaction-event-stream:9093"
+        value: "PLAINTEXT://trade-event-stream:9092,CONTROLLER://trade-event-stream:9093"
       - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-        value: "1@transaction-event-stream:9093"
+        value: "1@trade-event-stream:9093"
       - name: KAFKA_HEAP_OPTS
         value: "-Xmx400m -Xms400m"
       - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
@@ -735,7 +735,7 @@ components:
     env: []
 
 # ---------------------------------------------------------------------------
-# Ingress for the API gateway (transaction-api-gateway / Envoy)
+# Ingress for the API gateway (fix-api-gateway / Envoy)
 # ---------------------------------------------------------------------------
 ingress:
   enabled: false

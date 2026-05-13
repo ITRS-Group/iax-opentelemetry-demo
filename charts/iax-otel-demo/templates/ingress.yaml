@@ -36,7 +36,7 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: transaction-api-gateway
+                name: fix-api-gateway
                 port:
                   number: {{ .port }}
           {{- end }}
