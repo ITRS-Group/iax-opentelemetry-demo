@@ -7,9 +7,18 @@ are removed — IAX is the sole telemetry destination.
 
 ## Prerequisites
 
+**Docker Compose (Options 1–3):**
+
 - Docker Engine 20.10+
 - Docker Compose V2 (the `docker compose` plugin, **not** the standalone `docker-compose` v1)
 - Network access to your IAX instance's OTLP ingestion endpoint
+
+**Kubernetes / Helm (Option 4):**
+
+- Kubernetes 1.24+
+- Helm 3.10+
+- `kubectl` configured for your cluster
+- Network access from the cluster to your IAX instance's OTLP ingestion endpoint
 
 Verify Docker Compose V2 is installed:
 
@@ -193,18 +202,118 @@ docker run -d --network host \
 The collector receives OTLP on ports 4317 (gRPC) and 4318 (HTTP), then
 forwards everything to IAX.
 
+### Option 4: Deploy to Kubernetes with Helm
+
+A standalone Helm chart is included at `charts/iax-otel-demo/`. It deploys
+all demo microservices, infrastructure (PostgreSQL, Valkey, Kafka, flagd),
+and an OTel Collector pre-configured to export to IAX.
+
+**Install:**
+
+```bash
+helm install iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=your-iax-host:443 \
+  --set iax.ingestionUsername=your-username \
+  --set iax.ingestionPassword=your-password
+```
+
+**With a private registry (pull secret):**
+
+```bash
+kubectl create secret docker-registry nexus-pull \
+  --docker-server=docker.itrsgroup.com \
+  --docker-username=your-user \
+  --docker-password=your-pass
+
+helm install iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=your-iax-host:443 \
+  --set iax.ingestionUsername=your-username \
+  --set iax.ingestionPassword=your-password \
+  --set 'global.imagePullSecrets[0].name=nexus-pull'
+```
+
+**With an existing Secret for IAX credentials:**
+
+```bash
+kubectl create secret generic my-iax-creds \
+  --from-literal=IAX_OTLP_ENDPOINT=your-iax-host:443 \
+  --from-literal=IAX_OTLP_INSECURE=false \
+  --from-literal=IAX_OTLP_INSECURE_SKIP_VERIFY=false \
+  --from-literal=IAX_INGESTION_USERNAME=your-username \
+  --from-literal=IAX_INGESTION_PASSWORD=your-password
+
+helm install iax-demo ./charts/iax-otel-demo/ \
+  --set iax.existingSecret=my-iax-creds
+```
+
+**Enable Ingress:**
+
+```bash
+helm install iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=your-iax-host:443 \
+  --set iax.ingestionUsername=your-username \
+  --set iax.ingestionPassword=your-password \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set 'ingress.hosts[0].host=demo.example.com' \
+  --set 'ingress.hosts[0].paths[0].path=/' \
+  --set 'ingress.hosts[0].paths[0].pathType=Prefix' \
+  --set 'ingress.hosts[0].paths[0].port=8080'
+```
+
+**Verify:**
+
+```bash
+kubectl get pods -l app.kubernetes.io/part-of=iax-otel-demo
+kubectl logs deploy/iax-demo-otel-collector --tail 20
+```
+
+**Access the demo** (without Ingress):
+
+```bash
+kubectl port-forward svc/transaction-api-gateway 8080:8080
+# Open http://localhost:8080
+```
+
+**Uninstall:**
+
+```bash
+helm uninstall iax-demo
+```
+
+**Helm values reference:**
+
+| Value | Default | Description |
+| ----- | ------- | ----------- |
+| `global.imageRegistry` | `docker.itrsgroup.com/iax-otel-demo` | Container image registry |
+| `global.imageTag` | `1.0.2` | Image tag for all demo services |
+| `global.imagePullSecrets` | `[]` | Pull secrets for private registries |
+| `iax.otlpEndpoint` | `iax-ingestion.example.com:443` | IAX OTLP/gRPC endpoint |
+| `iax.otlpInsecure` | `false` | Disable TLS (dev only) |
+| `iax.otlpInsecureSkipVerify` | `false` | Skip TLS cert verification |
+| `iax.ingestionUsername` | `""` | IAX ingestion username |
+| `iax.ingestionPassword` | `""` | IAX ingestion password |
+| `iax.existingSecret` | `""` | Use a pre-existing Secret |
+| `ingress.enabled` | `false` | Enable Ingress for the API gateway |
+| `components.<name>.enabled` | `true` | Enable/disable individual services |
+
+See [`charts/iax-otel-demo/values.yaml`](charts/iax-otel-demo/values.yaml)
+for the full list of configurable values.
+
 ---
 
 ## Building/Testing/Publishing
 
-Build, test, and push images to Nexus. Requires a checkout of this repository.
-
-### Build and test locally
+Requires a checkout of this repository.
 
 ```bash
 git clone https://github.com/ITRS-Group/iax-opentelemetry-demo.git
 cd iax-opentelemetry-demo
+```
 
+### Build and test images locally
+
+```bash
 # Build all images (first build takes ~15 minutes)
 make iax-build
 
@@ -266,6 +375,88 @@ and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 | `IMAGE_REGISTRY`         | `docker.itrsgroup.com/iax-otel-demo` | Nexus registry path (each service is a separate image) |
 | `VERSION`                | `1.0.2`                              | Image version tag (e.g. `client-transaction-portal:1.0.2`)              |
 
+
+### Helm chart
+
+The Helm chart lives at `charts/iax-otel-demo/`. It does not need to be
+built — Helm renders it directly from source. The workflows below cover
+linting, testing, packaging, and publishing.
+
+**Lint:**
+
+```bash
+helm lint ./charts/iax-otel-demo/
+```
+
+**Render templates locally** (dry-run without a cluster):
+
+```bash
+helm template iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=test-host:443 \
+  --set iax.ingestionUsername=test-user \
+  --set iax.ingestionPassword=test-pass
+```
+
+Pipe through `kubectl apply --dry-run=client -f -` to validate against the
+Kubernetes API schema:
+
+```bash
+helm template iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=test-host:443 \
+  --set iax.ingestionUsername=test-user \
+  --set iax.ingestionPassword=test-pass \
+  | kubectl apply --dry-run=client -f -
+```
+
+**Test with custom values:**
+
+Create a `values-dev.yaml` override file for your environment:
+
+```yaml
+iax:
+  otlpEndpoint: "your-iax-host:443"
+  ingestionUsername: "your-username"
+  ingestionPassword: "your-password"
+
+global:
+  imageTag: "1.0.2"
+
+components:
+  simulated-market-activity:
+    enabled: false   # disable load generator during testing
+```
+
+Then install or upgrade:
+
+```bash
+helm upgrade --install iax-demo ./charts/iax-otel-demo/ -f values-dev.yaml
+```
+
+**Package the chart** (produces a `.tgz` archive):
+
+```bash
+helm package ./charts/iax-otel-demo/
+# Output: iax-otel-demo-0.1.0.tgz
+```
+
+**Publish to a Helm repository:**
+
+```bash
+# OCI registry (e.g. Nexus, Harbor, GitHub Container Registry)
+helm push iax-otel-demo-0.1.0.tgz oci://docker.itrsgroup.com/helm-charts
+
+# Install from the OCI registry
+helm install iax-demo oci://docker.itrsgroup.com/helm-charts/iax-otel-demo \
+  --version 0.1.0 \
+  --set iax.otlpEndpoint=your-iax-host:443 \
+  --set iax.ingestionUsername=your-username \
+  --set iax.ingestionPassword=your-password
+```
+
+**Bump the chart version:**
+
+Edit `charts/iax-otel-demo/Chart.yaml` — update `version` (chart version)
+and `appVersion` (image tag) as needed.
 
 ---
 
@@ -410,5 +601,40 @@ docker compose -f docker-compose.iax.yml down --remove-orphans --volumes
 
 ```bash
 docker images --format "{{.Repository}}:{{.Tag}}" | grep "iax-otel-demo/" | xargs docker rmi
+```
+
+### Kubernetes / Helm
+
+**Pods stuck in `ImagePullBackOff`:**
+The cluster cannot pull images from Nexus. Create a pull secret and pass it
+to the chart:
+
+```bash
+kubectl create secret docker-registry nexus-pull \
+  --docker-server=docker.itrsgroup.com \
+  --docker-username=your-user \
+  --docker-password=your-pass
+
+helm upgrade iax-demo ./charts/iax-otel-demo/ \
+  --set 'global.imagePullSecrets[0].name=nexus-pull'
+```
+
+**Collector pod `CrashLoopBackOff`:**
+Check the logs for IAX connectivity issues:
+
+```bash
+kubectl logs deploy/iax-demo-otel-collector --tail 30
+```
+
+Common causes: wrong `iax.otlpEndpoint`, missing credentials, or network
+policy blocking egress. The same `Unauthenticated`, `connection refused`, and
+TLS error patterns from the Docker section apply here.
+
+**Disable a service:**
+To disable a specific component (e.g., `simulated-market-activity`):
+
+```bash
+helm upgrade iax-demo ./charts/iax-otel-demo/ \
+  --set components.simulated-market-activity.enabled=false
 ```
 

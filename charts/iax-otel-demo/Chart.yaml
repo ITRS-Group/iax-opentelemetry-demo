@@ -1,0 +1,21 @@
+apiVersion: v2
+name: iax-otel-demo
+description: >-
+  IAX OpenTelemetry Demo — deploys the Astronomy Shop microservices with all
+  telemetry (traces, metrics, logs) forwarded to ITRS Analytics (IAX) via
+  OTLP/gRPC.
+type: application
+version: 0.1.0
+appVersion: "1.0.2"
+keywords:
+  - opentelemetry
+  - observability
+  - tracing
+  - metrics
+  - iax
+  - itrs-analytics
+home: https://github.com/ITRS-Group/iax-opentelemetry-demo
+sources:
+  - https://github.com/ITRS-Group/iax-opentelemetry-demo
+maintainers:
+  - name: ITRS Group

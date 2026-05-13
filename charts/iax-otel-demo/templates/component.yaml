@@ -1,0 +1,29 @@
+{{- range $name, $config := .Values.components }}
+    {{- $config := set . "Capabilities" $.Capabilities }}
+    {{- $config := set . "Template" $.Template }}
+    {{- $config := set . "name" ($name | lower) }}
+    {{- $config := set . "Release" $.Release }}
+    {{- $config := set . "Chart" $.Chart }}
+    {{- $config := set . "serviceAccount" $.Values.serviceAccount }}
+    {{- $config := set . "defaultValues" (dict
+        "replicas" $.Values.default.replicas
+        "env" $.Values.default.env
+        "envOverrides" $.Values.default.envOverrides
+        "image" (dict
+            "repository" ($.Values.default.image.repository | default $.Values.global.imageRegistry)
+            "tag" ($.Values.default.image.tag | default $.Values.global.imageTag)
+            "pullPolicy" ($.Values.default.image.pullPolicy | default $.Values.global.imagePullPolicy)
+            "pullSecrets" $.Values.global.imagePullSecrets
+        )
+        "schedulingRules" $.Values.default.schedulingRules
+        "securityContext" $.Values.default.securityContext
+        "podSecurityContext" $.Values.default.podSecurityContext
+    ) }}
+
+    {{- if $config.enabled }}
+        {{- include "iax-otel-demo.deployment" $config }}
+        {{- include "iax-otel-demo.service" $config }}
+        {{- include "iax-otel-demo.configmap" $config }}
+    {{- end }}
+
+{{- end }}

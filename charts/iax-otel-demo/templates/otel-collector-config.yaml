@@ -1,0 +1,136 @@
+{{- if .Values.otelCollector.enabled }}
+{{- $releaseName := include "iax-otel-demo.name" . -}}
+{{- $collectorName := printf "%s-otel-collector" $releaseName -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $collectorName }}-config
+  labels:
+    {{- include "iax-otel-demo.labels" (dict "Chart" .Chart "Release" .Release "name" "otel-collector") | nindent 4 }}
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: ${env:OTEL_COLLECTOR_HOST}:${env:OTEL_COLLECTOR_PORT_GRPC}
+          http:
+            endpoint: ${env:OTEL_COLLECTOR_HOST}:${env:OTEL_COLLECTOR_PORT_HTTP}
+            cors:
+              allowed_origins:
+                - "http://*"
+                - "https://*"
+      httpcheck/frontend-proxy:
+        targets:
+          - endpoint: http://${env:FRONTEND_PROXY_ADDR}
+      nginx:
+        endpoint: http://${env:IMAGE_PROVIDER_HOST}:${env:IMAGE_PROVIDER_PORT}/status
+        collection_interval: 10s
+      kafkametrics:
+        scrapers:
+          - brokers
+          - topics
+          - consumers
+        brokers:
+          - ${KAFKA_ADDR}
+        collection_interval: 10s
+      postgresql:
+        endpoint: ${POSTGRES_HOST}:${POSTGRES_PORT}
+        username: monitoring_user
+        password: ${env:POSTGRES_MONITORING_PASSWORD}
+        metrics:
+          postgresql.blks_hit:
+            enabled: true
+          postgresql.blks_read:
+            enabled: true
+          postgresql.tup_fetched:
+            enabled: true
+          postgresql.tup_returned:
+            enabled: true
+          postgresql.tup_inserted:
+            enabled: true
+          postgresql.tup_updated:
+            enabled: true
+          postgresql.tup_deleted:
+            enabled: true
+          postgresql.deadlocks:
+            enabled: true
+        tls:
+          insecure: true
+      redis:
+        endpoint: "valkey-cart:6379"
+        username: "valkey"
+        collection_interval: 10s
+
+    exporters:
+      debug:
+      otlp_grpc/iax:
+        endpoint: ${env:IAX_OTLP_ENDPOINT}
+        tls:
+          insecure: ${env:IAX_OTLP_INSECURE}
+          insecure_skip_verify: ${env:IAX_OTLP_INSECURE_SKIP_VERIFY}
+        headers:
+          x-iax-source: "opentelemetry-demo"
+          otel-client-username: ${env:IAX_INGESTION_USERNAME}
+          otel-client-password: ${env:IAX_INGESTION_PASSWORD}
+        sending_queue:
+          batch:
+
+    processors:
+      memory_limiter:
+        check_interval: 5s
+        limit_percentage: 80
+        spike_limit_percentage: 25
+      resourcedetection:
+        detectors: [env]
+      transform/sanitize_spans:
+        error_mode: ignore
+        trace_statements:
+          - context: span
+            statements:
+              - set(span.attributes["http.route"], "/api/cart") where
+                span.kind == SPAN_KIND_SERVER and
+                resource.attributes["service.name"] == "frontend" and
+                span.attributes["http.route"] == nil and
+                IsMatch(span.attributes["http.target"], "\\/api\\/cart")
+              - set(span.attributes["http.route"], "/api/checkout") where
+                span.kind == SPAN_KIND_SERVER and
+                resource.attributes["service.name"] == "frontend" and
+                span.attributes["http.route"] == nil and
+                IsMatch(span.attributes["http.target"], "\\/api\\/checkout")
+              - set(span.attributes["http.route"], "/api/products/{productId}") where
+                span.kind == SPAN_KIND_SERVER and
+                resource.attributes["service.name"] == "frontend" and
+                span.attributes["http.route"] == nil and
+                IsMatch(span.attributes["http.target"], "\\/api\\/products\\/.*")
+              - set(span.attributes["http.route"], "/api/recommendations") where
+                span.kind == SPAN_KIND_SERVER and
+                resource.attributes["service.name"] == "frontend" and
+                span.attributes["http.route"] == nil and
+                IsMatch(span.attributes["http.target"], "\\/api\\/recommendations")
+              - set(span.attributes["http.route"], "/api/data") where
+                span.kind == SPAN_KIND_SERVER and
+                resource.attributes["service.name"] == "frontend" and
+                span.attributes["http.route"] == nil and
+                IsMatch(span.attributes["http.target"], "\\/api\\/data.*")
+              - set_semconv_span_name("1.37.0", "original_span_name")
+
+    connectors:
+      spanmetrics:
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [resourcedetection, memory_limiter, transform/sanitize_spans]
+          exporters: [otlp_grpc/iax, debug, spanmetrics]
+        metrics:
+          receivers: [httpcheck/frontend-proxy, nginx, otlp, postgresql, redis, spanmetrics, kafkametrics]
+          processors: [resourcedetection, memory_limiter]
+          exporters: [otlp_grpc/iax, debug]
+        logs:
+          receivers: [otlp]
+          processors: [resourcedetection, memory_limiter]
+          exporters: [otlp_grpc/iax, debug]
+{{- end }}
