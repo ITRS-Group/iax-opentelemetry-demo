@@ -672,9 +672,10 @@ components:
     livenessProbe:
       tcpSocket:
         port: 9092
-      initialDelaySeconds: 10
-      periodSeconds: 5
+      initialDelaySeconds: 60
+      periodSeconds: 10
       timeoutSeconds: 10
+      failureThreshold: 6
 
   # -- llm — mock LLM service
   llm:
@@ -685,7 +686,7 @@ components:
       port: 8000
     resources:
       limits:
-        memory: 50Mi
+        memory: 200Mi
     env:
       - name: FLAGD_HOST
         value: incident-control
