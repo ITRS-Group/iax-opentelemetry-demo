@@ -625,7 +625,7 @@ components:
     resources:
       limits:
         memory: 75Mi
-    command:
+    args:
       - start
       - --uri
       - file:./etc/flagd/demo.flagd.json
@@ -662,7 +662,7 @@ components:
       - name: KAFKA_ADVERTISED_LISTENERS
         value: "PLAINTEXT://trade-event-stream:9092"
       - name: KAFKA_LISTENERS
-        value: "PLAINTEXT://trade-event-stream:9092,CONTROLLER://trade-event-stream:9093"
+        value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
       - name: KAFKA_CONTROLLER_QUORUM_VOTERS
         value: "1@trade-event-stream:9093"
       - name: KAFKA_HEAP_OPTS
@@ -705,7 +705,7 @@ components:
     resources:
       limits:
         memory: 80Mi
-    command:
+    args:
       - postgres
       - -c
       - shared_preload_libraries=pg_stat_statements

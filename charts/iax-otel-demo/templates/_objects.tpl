@@ -57,6 +57,10 @@ spec:
           command:
             {{- .command | toYaml | nindent 12 }}
           {{- end }}
+          {{- if .args }}
+          args:
+            {{- .args | toYaml | nindent 12 }}
+          {{- end }}
           {{- if or .ports .service }}
           ports:
             {{- include "iax-otel-demo.pod.ports" . | nindent 12 }}
