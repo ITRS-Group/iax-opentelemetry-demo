@@ -264,15 +264,15 @@ helm install iax-demo ./charts/iax-otel-demo/ \
 **Verify:**
 
 ```bash
-kubectl get pods -l app.kubernetes.io/part-of=iax-otel-demo
+kubectl get pods -l opentelemetry.io/name
 kubectl logs deploy/iax-demo-otel-collector --tail 20
 ```
 
 **Access the demo** (without Ingress):
 
 ```bash
-kubectl port-forward svc/fix-api-gateway 8080:8080
-# Open http://localhost:8080
+kubectl port-forward svc/fix-api-gateway 9090:8080 --address=0.0.0.0
+# Open http://<cluster-host>:9090
 ```
 
 **Uninstall:**
@@ -629,6 +629,25 @@ kubectl logs deploy/iax-demo-otel-collector --tail 30
 Common causes: wrong `iax.otlpEndpoint`, missing credentials, or network
 policy blocking egress. The same `Unauthenticated`, `connection refused`, and
 TLS error patterns from the Docker section apply here.
+
+**Pods stuck in `CrashLoopBackOff` after dependencies recover:**
+If a pod was crash-looping because its dependency was down (e.g.,
+`instrument-reference-data` waiting for `astronomy-db`), it may stay in
+backoff even after the dependency recovers. Delete the pod to force a fresh
+start:
+
+```bash
+kubectl delete pod <pod-name>
+```
+
+**Cannot reach the demo UI from your browser:**
+If you are SSH'd into the cluster host, bind to all interfaces so your
+browser can reach it:
+
+```bash
+kubectl port-forward svc/fix-api-gateway 9090:8080 --address=0.0.0.0
+# Open http://<cluster-host>:9090
+```
 
 **Disable a service:**
 To disable a specific component (e.g., `simulated-fix-order-flow`):
