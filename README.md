@@ -7,9 +7,18 @@ are removed — IAX is the sole telemetry destination.
 
 ## Prerequisites
 
+**Docker Compose (Options 1–3):**
+
 - Docker Engine 20.10+
 - Docker Compose V2 (the `docker compose` plugin, **not** the standalone `docker-compose` v1)
 - Network access to your IAX instance's OTLP ingestion endpoint
+
+**Kubernetes / Helm (Option 4):**
+
+- Kubernetes 1.24+
+- Helm 3.10+
+- `kubectl` configured for your cluster
+- Network access from the cluster to your IAX instance's OTLP ingestion endpoint
 
 Verify Docker Compose V2 is installed:
 
@@ -101,7 +110,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE_SKIP_VERIFY=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2 \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.3 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -112,29 +121,29 @@ docker logs otel-collector --tail 5
 # Look for: "Everything is ready. Begin running and processing data."
 ```
 
-**Step 2 — Start a demo service** (example: client-transaction-portal on port 8080):
+**Step 2 — Start a demo service** (example: trader-order-entry on port 8080):
 
 ```bash
-docker run -d --name client-transaction-portal --network host \
+docker run -d --name trader-order-entry --network host \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
-  -e OTEL_SERVICE_NAME=client-transaction-portal \
+  -e OTEL_SERVICE_NAME=trader-order-entry \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e PORT=8080 \
-  docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.2
+  docker.itrsgroup.com/iax-otel-demo/trader-order-entry:1.0.3
 ```
 
-**Step 3 — Start the load generator** (drives traffic through the client-transaction-portal):
+**Step 3 — Start the load generator** (drives traffic through the trader-order-entry):
 
 ```bash
-docker run -d --name simulated-market-activity --network host \
+docker run -d --name simulated-fix-order-flow --network host \
   -e OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
-  -e OTEL_SERVICE_NAME=simulated-market-activity \
+  -e OTEL_SERVICE_NAME=simulated-fix-order-flow \
   -e OTEL_RESOURCE_ATTRIBUTES=service.namespace=iax-otel-demo \
   -e LOCUST_WEB_HOST=0.0.0.0 \
   -e LOCUST_WEB_PORT=8089 \
   -e LOCUST_AUTOSTART=true \
   -e LOCUST_HOST=http://localhost:8080 \
-  docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.2
+  docker.itrsgroup.com/iax-otel-demo/simulated-fix-order-flow:1.0.3
 ```
 
 The load generator UI is at `http://localhost:8089`.
@@ -149,7 +158,7 @@ docker logs otel-collector --tail 10
 **Step 5 — Clean up:**
 
 ```bash
-docker rm -f otel-collector client-transaction-portal simulated-market-activity
+docker rm -f otel-collector trader-order-entry simulated-fix-order-flow
 ```
 
 > **Note:** In this mode, only the services you start will generate telemetry.
@@ -170,7 +179,7 @@ docker run -d --name otel-collector --network host \
   -e IAX_OTLP_INSECURE_SKIP_VERIFY=false \
   -e IAX_INGESTION_USERNAME=your-username \
   -e IAX_INGESTION_PASSWORD=your-password \
-  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2 \
+  docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.3 \
   --config=/etc/otelcol-config-standalone.yml
 ```
 
@@ -193,18 +202,118 @@ docker run -d --network host \
 The collector receives OTLP on ports 4317 (gRPC) and 4318 (HTTP), then
 forwards everything to IAX.
 
+### Option 4: Deploy to Kubernetes with Helm
+
+A standalone Helm chart is included at `charts/iax-otel-demo/`. It deploys
+all demo microservices, infrastructure (PostgreSQL, Valkey, Kafka, flagd),
+and an OTel Collector pre-configured to export to IAX.
+
+**Install:**
+
+```bash
+helm install iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=your-iax-host:443 \
+  --set iax.ingestionUsername=your-username \
+  --set iax.ingestionPassword=your-password
+```
+
+**With a private registry (pull secret):**
+
+```bash
+kubectl create secret docker-registry nexus-pull \
+  --docker-server=docker.itrsgroup.com \
+  --docker-username=your-user \
+  --docker-password=your-pass
+
+helm install iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=your-iax-host:443 \
+  --set iax.ingestionUsername=your-username \
+  --set iax.ingestionPassword=your-password \
+  --set 'global.imagePullSecrets[0].name=nexus-pull'
+```
+
+**With an existing Secret for IAX credentials:**
+
+```bash
+kubectl create secret generic my-iax-creds \
+  --from-literal=IAX_OTLP_ENDPOINT=your-iax-host:443 \
+  --from-literal=IAX_OTLP_INSECURE=false \
+  --from-literal=IAX_OTLP_INSECURE_SKIP_VERIFY=false \
+  --from-literal=IAX_INGESTION_USERNAME=your-username \
+  --from-literal=IAX_INGESTION_PASSWORD=your-password
+
+helm install iax-demo ./charts/iax-otel-demo/ \
+  --set iax.existingSecret=my-iax-creds
+```
+
+**Enable Ingress:**
+
+```bash
+helm install iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=your-iax-host:443 \
+  --set iax.ingestionUsername=your-username \
+  --set iax.ingestionPassword=your-password \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set 'ingress.hosts[0].host=demo.example.com' \
+  --set 'ingress.hosts[0].paths[0].path=/' \
+  --set 'ingress.hosts[0].paths[0].pathType=Prefix' \
+  --set 'ingress.hosts[0].paths[0].port=8080'
+```
+
+**Verify:**
+
+```bash
+kubectl get pods -l opentelemetry.io/name
+kubectl logs deploy/iax-demo-otel-collector --tail 20
+```
+
+**Access the demo** (without Ingress):
+
+```bash
+kubectl port-forward svc/fix-api-gateway 9090:8080 --address=0.0.0.0
+# Open http://<cluster-host>:9090
+```
+
+**Uninstall:**
+
+```bash
+helm uninstall iax-demo
+```
+
+**Helm values reference:**
+
+| Value | Default | Description |
+| ----- | ------- | ----------- |
+| `global.imageRegistry` | `docker.itrsgroup.com/iax-otel-demo` | Container image registry |
+| `global.imageTag` | `1.0.3` | Image tag for all demo services |
+| `global.imagePullSecrets` | `[]` | Pull secrets for private registries |
+| `iax.otlpEndpoint` | `iax-ingestion.example.com:443` | IAX OTLP/gRPC endpoint |
+| `iax.otlpInsecure` | `false` | Disable TLS (dev only) |
+| `iax.otlpInsecureSkipVerify` | `false` | Skip TLS cert verification |
+| `iax.ingestionUsername` | `""` | IAX ingestion username |
+| `iax.ingestionPassword` | `""` | IAX ingestion password |
+| `iax.existingSecret` | `""` | Use a pre-existing Secret |
+| `ingress.enabled` | `false` | Enable Ingress for the API gateway |
+| `components.<name>.enabled` | `true` | Enable/disable individual services |
+
+See [`charts/iax-otel-demo/values.yaml`](charts/iax-otel-demo/values.yaml)
+for the full list of configurable values.
+
 ---
 
 ## Building/Testing/Publishing
 
-Build, test, and push images to Nexus. Requires a checkout of this repository.
-
-### Build and test locally
+Requires a checkout of this repository.
 
 ```bash
 git clone https://github.com/ITRS-Group/iax-opentelemetry-demo.git
 cd iax-opentelemetry-demo
+```
 
+### Build and test images locally
+
+```bash
 # Build all images (first build takes ~15 minutes)
 make iax-build
 
@@ -232,10 +341,10 @@ make iax-push
 Each service is a separate image under `docker.itrsgroup.com/iax-otel-demo/`,
 for example:
 
-- `docker.itrsgroup.com/iax-otel-demo/client-transaction-portal:1.0.2`
-- `docker.itrsgroup.com/iax-otel-demo/payment-orchestration:1.0.2`
-- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.2`
-- `docker.itrsgroup.com/iax-otel-demo/simulated-market-activity:1.0.2`
+- `docker.itrsgroup.com/iax-otel-demo/trader-order-entry:1.0.3`
+- `docker.itrsgroup.com/iax-otel-demo/order-routing:1.0.3`
+- `docker.itrsgroup.com/iax-otel-demo/otel-collector:1.0.3`
+- `docker.itrsgroup.com/iax-otel-demo/simulated-fix-order-flow:1.0.3`
 
 ### Makefile targets
 
@@ -264,31 +373,113 @@ and credentials go in `.env.iax.local` (gitignored). The Makefile loads both
 | `IAX_INGESTION_USERNAME` | *(empty)*                            | IAX ingestion credential username (gRPC metadata auth) |
 | `IAX_INGESTION_PASSWORD` | *(empty)*                            | IAX ingestion credential password                      |
 | `IMAGE_REGISTRY`         | `docker.itrsgroup.com/iax-otel-demo` | Nexus registry path (each service is a separate image) |
-| `VERSION`                | `1.0.2`                              | Image version tag (e.g. `client-transaction-portal:1.0.2`)              |
+| `VERSION`                | `1.0.3`                              | Image version tag (e.g. `trader-order-entry:1.0.3`)              |
 
+
+### Helm chart
+
+The Helm chart lives at `charts/iax-otel-demo/`. It does not need to be
+built — Helm renders it directly from source. The workflows below cover
+linting, testing, packaging, and publishing.
+
+**Lint:**
+
+```bash
+helm lint ./charts/iax-otel-demo/
+```
+
+**Render templates locally** (dry-run without a cluster):
+
+```bash
+helm template iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=test-host:443 \
+  --set iax.ingestionUsername=test-user \
+  --set iax.ingestionPassword=test-pass
+```
+
+Pipe through `kubectl apply --dry-run=client -f -` to validate against the
+Kubernetes API schema:
+
+```bash
+helm template iax-demo ./charts/iax-otel-demo/ \
+  --set iax.otlpEndpoint=test-host:443 \
+  --set iax.ingestionUsername=test-user \
+  --set iax.ingestionPassword=test-pass \
+  | kubectl apply --dry-run=client -f -
+```
+
+**Test with custom values:**
+
+Create a `values-dev.yaml` override file for your environment:
+
+```yaml
+iax:
+  otlpEndpoint: "your-iax-host:443"
+  ingestionUsername: "your-username"
+  ingestionPassword: "your-password"
+
+global:
+  imageTag: "1.0.3"
+
+components:
+  simulated-fix-order-flow:
+    enabled: false   # disable load generator during testing
+```
+
+Then install or upgrade:
+
+```bash
+helm upgrade --install iax-demo ./charts/iax-otel-demo/ -f values-dev.yaml
+```
+
+**Package the chart** (produces a `.tgz` archive):
+
+```bash
+helm package ./charts/iax-otel-demo/
+# Output: iax-otel-demo-0.1.0.tgz
+```
+
+**Publish to a Helm repository:**
+
+```bash
+# OCI registry (e.g. Nexus, Harbor, GitHub Container Registry)
+helm push iax-otel-demo-0.1.0.tgz oci://docker.itrsgroup.com/helm-charts
+
+# Install from the OCI registry
+helm install iax-demo oci://docker.itrsgroup.com/helm-charts/iax-otel-demo \
+  --version 0.1.0 \
+  --set iax.otlpEndpoint=your-iax-host:443 \
+  --set iax.ingestionUsername=your-username \
+  --set iax.ingestionPassword=your-password
+```
+
+**Bump the chart version:**
+
+Edit `charts/iax-otel-demo/Chart.yaml` — update `version` (chart version)
+and `appVersion` (image tag) as needed.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Docker Compose (otel-demo-iax network)                     │
-│                                                             │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │ client-     │ │ payment-     │ │ payment- │ │ transaction-│       │
-│  │ transaction-│ │ orchestr-   │ │ gateway  │ │ staging     │       │
-│  │ portal      │ │ ation       │ │          │ │             │  ...  │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘       │
-│       │             │            │             │             │
-│       └─────────────┴────────────┴─────────────┘             │
-│                          │                                   │
-│                ┌─────────▼──────────┐                        │
-│                │   OTel Collector   │                        │
-│                │  (otelcol-contrib)  │                        │
-│                └─────────┬──────────┘                        │
-│                          │ OTLP/gRPC                         │
-└──────────────────────────┼───────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Docker Compose / Kubernetes                                  │
+│                                                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
+│  │ trader-  │ │ order-   │ │ execution│ │ order-   │        │
+│  │ order-   │ │ routing  │ │ -venue-  │ │ staging  │  ...   │
+│  │ entry    │ │          │ │ adapter  │ │          │        │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘        │
+│       │             │            │             │              │
+│       └─────────────┴────────────┴─────────────┘              │
+│                          │                                    │
+│                ┌─────────▼──────────┐                         │
+│                │   OTel Collector   │                         │
+│                │  (otelcol-contrib)  │                         │
+│                └─────────┬──────────┘                         │
+│                          │ OTLP/gRPC                          │
+└──────────────────────────┼────────────────────────────────────┘
                            │
                            ▼
                 ┌─────────────────────┐
@@ -313,25 +504,25 @@ All data is tagged with `service.namespace=iax-otel-demo` for easy filtering in 
 ## Services
 
 
-| Service         | Language      | Telemetry             |
-| --------------- | ------------- | --------------------- |
-| ledger-booking      | .NET          | Traces, Metrics       |
-| market-news              | Java          | Traces, Metrics, Logs |
-| transaction-staging            | .NET          | Traces, Metrics       |
-| payment-orchestration        | Go            | Traces, Metrics       |
-| fx-rate        | C++           | Traces, Metrics       |
-| client-notification           | Ruby          | Traces, Metrics       |
-| risk-compliance | Java/Kotlin   | Traces, Metrics       |
-| client-transaction-portal        | Node.js       | Traces, Metrics       |
-| transaction-api-gateway  | Envoy         | Traces, Metrics       |
-| document-imaging  | Nginx         | Metrics               |
-| simulated-market-activity  | Python/Locust | Traces, Metrics       |
-| payment-gateway         | Node.js       | Traces, Metrics       |
-| reference-data | Go            | Traces, Metrics, Logs |
-| transaction-audit | Python        | Traces, Metrics, Logs |
-| pricing-quote           | PHP           | Traces, Metrics       |
-| ops-recommendation  | Python        | Traces, Metrics, Logs |
-| settlement        | Rust          | Traces, Metrics       |
+| Service                    | Language      | Telemetry             |
+| -------------------------- | ------------- | --------------------- |
+| trade-capture              | .NET          | Traces, Metrics       |
+| market-news                | Java          | Traces, Metrics, Logs |
+| order-staging              | .NET          | Traces, Metrics       |
+| order-routing              | Go            | Traces, Metrics       |
+| fx-rates                   | C++           | Traces, Metrics       |
+| trade-notifications        | Ruby          | Traces, Metrics       |
+| pre-trade-risk             | Java/Kotlin   | Traces, Metrics       |
+| trader-order-entry         | Node.js       | Traces, Metrics       |
+| fix-api-gateway            | Envoy         | Traces, Metrics       |
+| trade-documents            | Nginx         | Metrics               |
+| simulated-fix-order-flow   | Python/Locust | Traces, Metrics       |
+| execution-venue-adapter    | Node.js       | Traces, Metrics       |
+| instrument-reference-data  | Go            | Traces, Metrics, Logs |
+| trade-audit                | Python        | Traces, Metrics, Logs |
+| market-data-quotes         | PHP           | Traces, Metrics       |
+| smart-order-recommendation | Python        | Traces, Metrics, Logs |
+| settlement-instructions    | Rust          | Traces, Metrics       |
 
 
 ## What to Expect in IAX
@@ -340,13 +531,13 @@ Once the demo is running and the collector is exporting successfully, data
 appears in IAX within 1–2 minutes:
 
 - **Traces** — distributed traces spanning multiple services (e.g., a checkout
-request touches `client-transaction-portal` → `payment-orchestration` → `payment-gateway` → `settlement` → `client-notification`).
+request touches `trader-order-entry` → `order-routing` → `execution-venue-adapter` → `settlement-instructions` → `trade-notifications`).
 Filter by `service.namespace = iax-otel-demo` to isolate demo traffic.
 - **Metrics** — application-level metrics (request counts, latencies, error
 rates) plus infrastructure metrics (host, Docker stats, Kafka, PostgreSQL,
 Valkey). Span metrics are auto-generated from traces.
 - **Logs** — application logs from services that emit them (`market-news`,
-`reference-data`, `transaction-audit`, `ops-recommendation`).
+`instrument-reference-data`, `trade-audit`, `smart-order-recommendation`).
 
 If you don't see data after 2 minutes, check the collector logs and refer to
 the Troubleshooting section below.
@@ -393,11 +584,11 @@ sudo apt install docker-compose-plugin   # Debian/Ubuntu with Docker's apt repo
 Verify with `docker compose version` — it should report v2.x.x or later.
 
 **Container name conflicts:**
-If you see `The container name "/client-transaction-portal" is already in use`, remove the
+If you see `The container name "/trader-order-entry" is already in use`, remove the
 stale container first:
 
 ```bash
-docker rm -f client-transaction-portal
+docker rm -f trader-order-entry
 ```
 
 To remove all demo containers at once (Docker Compose):
@@ -410,5 +601,59 @@ docker compose -f docker-compose.iax.yml down --remove-orphans --volumes
 
 ```bash
 docker images --format "{{.Repository}}:{{.Tag}}" | grep "iax-otel-demo/" | xargs docker rmi
+```
+
+### Kubernetes / Helm
+
+**Pods stuck in `ImagePullBackOff`:**
+The cluster cannot pull images from Nexus. Create a pull secret and pass it
+to the chart:
+
+```bash
+kubectl create secret docker-registry nexus-pull \
+  --docker-server=docker.itrsgroup.com \
+  --docker-username=your-user \
+  --docker-password=your-pass
+
+helm upgrade iax-demo ./charts/iax-otel-demo/ \
+  --set 'global.imagePullSecrets[0].name=nexus-pull'
+```
+
+**Collector pod `CrashLoopBackOff`:**
+Check the logs for IAX connectivity issues:
+
+```bash
+kubectl logs deploy/iax-demo-otel-collector --tail 30
+```
+
+Common causes: wrong `iax.otlpEndpoint`, missing credentials, or network
+policy blocking egress. The same `Unauthenticated`, `connection refused`, and
+TLS error patterns from the Docker section apply here.
+
+**Pods stuck in `CrashLoopBackOff` after dependencies recover:**
+If a pod was crash-looping because its dependency was down (e.g.,
+`instrument-reference-data` waiting for `astronomy-db`), it may stay in
+backoff even after the dependency recovers. Delete the pod to force a fresh
+start:
+
+```bash
+kubectl delete pod <pod-name>
+```
+
+**Cannot reach the demo UI from your browser:**
+If you are SSH'd into the cluster host, bind to all interfaces so your
+browser can reach it:
+
+```bash
+kubectl port-forward svc/fix-api-gateway 9090:8080 --address=0.0.0.0
+# Open http://<cluster-host>:9090
+```
+
+**Disable a service:**
+To disable a specific component (e.g., `simulated-fix-order-flow`):
+
+```bash
+helm upgrade iax-demo ./charts/iax-otel-demo/ \
+  --set components.simulated-fix-order-flow.enabled=false
 ```
 

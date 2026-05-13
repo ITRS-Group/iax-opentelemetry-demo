@@ -1,0 +1,125 @@
+{{- if .Values.otelCollector.enabled }}
+{{- $releaseName := include "iax-otel-demo.name" . -}}
+{{- $collectorName := printf "%s-otel-collector" $releaseName -}}
+{{- $secretName := .Values.iax.existingSecret | default (printf "%s-iax-credentials" $releaseName) -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $collectorName }}
+  labels:
+    {{- include "iax-otel-demo.labels" (dict "Chart" .Chart "Release" .Release "name" "otel-collector") | nindent 4 }}
+spec:
+  replicas: {{ .Values.otelCollector.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "iax-otel-demo.selectorLabels" (dict "name" "otel-collector") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "iax-otel-demo.selectorLabels" (dict "name" "otel-collector") | nindent 8 }}
+        {{- include "iax-otel-demo.workloadLabels" (dict "Chart" .Chart "name" "otel-collector") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/otel-collector-config.yaml") . | sha256sum }}
+    spec:
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- .Values.global.imagePullSecrets | toYaml | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "iax-otel-demo.serviceAccountName" . }}
+      containers:
+        - name: otel-collector
+          image: {{ .Values.otelCollector.image.repository | default (printf "%s/otel-collector" .Values.global.imageRegistry) }}:{{ .Values.otelCollector.image.tag | default .Values.global.imageTag }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command:
+            - /otelcol-contrib
+            - --config=/etc/otelcol/config.yaml
+          ports:
+            - containerPort: {{ .Values.otelCollector.ports.grpc }}
+              name: otlp-grpc
+              protocol: TCP
+            - containerPort: {{ .Values.otelCollector.ports.http }}
+              name: otlp-http
+              protocol: TCP
+          env:
+            - name: OTEL_COLLECTOR_HOST
+              value: "0.0.0.0"
+            - name: OTEL_COLLECTOR_PORT_GRPC
+              value: {{ .Values.otelCollector.ports.grpc | quote }}
+            - name: OTEL_COLLECTOR_PORT_HTTP
+              value: {{ .Values.otelCollector.ports.http | quote }}
+            - name: FRONTEND_PROXY_ADDR
+              value: "fix-api-gateway:8080"
+            - name: IMAGE_PROVIDER_HOST
+              value: "trade-documents"
+            - name: IMAGE_PROVIDER_PORT
+              value: "8081"
+            - name: KAFKA_ADDR
+              value: "trade-event-stream:9092"
+            - name: POSTGRES_HOST
+              value: "astronomy-db"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_PASSWORD
+              value: "changeit"
+            - name: POSTGRES_MONITORING_PASSWORD
+              value: "monitoring_password"
+            - name: GOMEMLIMIT
+              value: "160MiB"
+            - name: IAX_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: IAX_OTLP_ENDPOINT
+            - name: IAX_OTLP_INSECURE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: IAX_OTLP_INSECURE
+            - name: IAX_OTLP_INSECURE_SKIP_VERIFY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: IAX_OTLP_INSECURE_SKIP_VERIFY
+            - name: IAX_INGESTION_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: IAX_INGESTION_USERNAME
+            - name: IAX_INGESTION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: IAX_INGESTION_PASSWORD
+          {{- if .Values.otelCollector.resources }}
+          resources:
+            {{- .Values.otelCollector.resources | toYaml | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: otel-collector-config
+              mountPath: /etc/otelcol
+      volumes:
+        - name: otel-collector-config
+          configMap:
+            name: {{ $collectorName }}-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $collectorName }}
+  labels:
+    {{- include "iax-otel-demo.labels" (dict "Chart" .Chart "Release" .Release "name" "otel-collector") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.otelCollector.ports.grpc }}
+      name: otlp-grpc
+      targetPort: {{ .Values.otelCollector.ports.grpc }}
+      protocol: TCP
+    - port: {{ .Values.otelCollector.ports.http }}
+      name: otlp-http
+      targetPort: {{ .Values.otelCollector.ports.http }}
+      protocol: TCP
+  selector:
+    {{- include "iax-otel-demo.selectorLabels" (dict "name" "otel-collector") | nindent 4 }}
+{{- end }}

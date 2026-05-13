@@ -26,14 +26,14 @@ services:
   # Core Demo Services
   # ******************
 
-  ledger-booking:
-    image: ${IMAGE_REGISTRY}/ledger-booking:${VERSION}
-    container_name: ledger-booking
+  trade-capture:
+    image: ${IMAGE_REGISTRY}/trade-capture:${VERSION}
+    container_name: trade-capture
     build:
       context: ./
       dockerfile: ${ACCOUNTING_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/ledger-booking:${VERSION}
+        - ${IMAGE_REGISTRY}/trade-capture:${VERSION}
     deploy:
       resources:
         limits:
@@ -44,13 +44,13 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=ledger-booking
+      - OTEL_SERVICE_NAME=trade-capture
       - DB_CONNECTION_STRING=Host=${POSTGRES_HOST};Username=astronomy_user;Password=${POSTGRES_ASTRONOMY_PASSWORD};Database=astronomy_db
       - OTEL_DOTNET_AUTO_TRACES_ENTITYFRAMEWORKCORE_INSTRUMENTATION_ENABLED=false
     depends_on:
       otel-collector:
         condition: service_started
-      transaction-event-stream:
+      trade-event-stream:
         condition: service_healthy
     logging: *logging
 
@@ -87,14 +87,14 @@ services:
         condition: service_started
     logging: *logging
 
-  transaction-staging:
-    image: ${IMAGE_REGISTRY}/transaction-staging:${VERSION}
-    container_name: transaction-staging
+  order-staging:
+    image: ${IMAGE_REGISTRY}/order-staging:${VERSION}
+    container_name: order-staging
     build:
       context: ./
       dockerfile: ${CART_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/transaction-staging:${VERSION}
+        - ${IMAGE_REGISTRY}/order-staging:${VERSION}
     deploy:
       resources:
         limits:
@@ -110,7 +110,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=high
-      - OTEL_SERVICE_NAME=transaction-staging
+      - OTEL_SERVICE_NAME=order-staging
       - ASPNETCORE_URLS=http://*:${CART_PORT}
     depends_on:
       valkey-cart:
@@ -121,14 +121,14 @@ services:
         condition: service_started
     logging: *logging
 
-  payment-orchestration:
-    image: ${IMAGE_REGISTRY}/payment-orchestration:${VERSION}
-    container_name: payment-orchestration
+  order-routing:
+    image: ${IMAGE_REGISTRY}/order-routing:${VERSION}
+    container_name: order-routing
     build:
       context: ./
       dockerfile: ${CHECKOUT_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/payment-orchestration:${VERSION}
+        - ${IMAGE_REGISTRY}/order-routing:${VERSION}
     deploy:
       resources:
         limits:
@@ -151,36 +151,36 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
-      - OTEL_SERVICE_NAME=payment-orchestration
+      - OTEL_SERVICE_NAME=order-routing
     depends_on:
-      transaction-staging:
+      order-staging:
         condition: service_started
-      fx-rate:
+      fx-rates:
         condition: service_started
-      client-notification:
+      trade-notifications:
         condition: service_started
-      payment-gateway:
+      execution-venue-adapter:
         condition: service_started
-      reference-data:
+      instrument-reference-data:
         condition: service_started
-      settlement:
+      settlement-instructions:
         condition: service_started
       otel-collector:
         condition: service_started
-      transaction-event-stream:
+      trade-event-stream:
         condition: service_healthy
       incident-control:
         condition: service_started
     logging: *logging
 
-  fx-rate:
-    image: ${IMAGE_REGISTRY}/fx-rate:${VERSION}
-    container_name: fx-rate
+  fx-rates:
+    image: ${IMAGE_REGISTRY}/fx-rates:${VERSION}
+    container_name: fx-rates
     build:
       context: ./
       dockerfile: ${CURRENCY_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/fx-rate:${VERSION}
+        - ${IMAGE_REGISTRY}/fx-rates:${VERSION}
       args:
         OPENTELEMETRY_CPP_VERSION: ${OPENTELEMETRY_CPP_VERSION}
     deploy:
@@ -197,20 +197,20 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=high
-      - OTEL_SERVICE_NAME=fx-rate
+      - OTEL_SERVICE_NAME=fx-rates
     depends_on:
       otel-collector:
         condition: service_started
     logging: *logging
 
-  client-notification:
-    image: ${IMAGE_REGISTRY}/client-notification:${VERSION}
-    container_name: client-notification
+  trade-notifications:
+    image: ${IMAGE_REGISTRY}/trade-notifications:${VERSION}
+    container_name: trade-notifications
     build:
       context: ./
       dockerfile: ${EMAIL_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/client-notification:${VERSION}
+        - ${IMAGE_REGISTRY}/trade-notifications:${VERSION}
     deploy:
       resources:
         limits:
@@ -226,20 +226,20 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
-      - OTEL_SERVICE_NAME=client-notification
+      - OTEL_SERVICE_NAME=trade-notifications
     depends_on:
       otel-collector:
         condition: service_started
     logging: *logging
 
-  risk-compliance:
-    image: ${IMAGE_REGISTRY}/risk-compliance:${VERSION}
-    container_name: risk-compliance
+  pre-trade-risk:
+    image: ${IMAGE_REGISTRY}/pre-trade-risk:${VERSION}
+    container_name: pre-trade-risk
     build:
       context: ./
       dockerfile: ${FRAUD_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/risk-compliance:${VERSION}
+        - ${IMAGE_REGISTRY}/pre-trade-risk:${VERSION}
       args:
         OTEL_JAVA_AGENT_VERSION: ${OTEL_JAVA_AGENT_VERSION}
     deploy:
@@ -256,22 +256,22 @@ services:
       - OTEL_INSTRUMENTATION_KAFKA_EXPERIMENTAL_SPAN_ATTRIBUTES=true
       - OTEL_INSTRUMENTATION_MESSAGING_EXPERIMENTAL_RECEIVE_TELEMETRY_ENABLED=true
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=risk-compliance
+      - OTEL_SERVICE_NAME=pre-trade-risk
     depends_on:
       otel-collector:
         condition: service_started
-      transaction-event-stream:
+      trade-event-stream:
         condition: service_healthy
     logging: *logging
 
-  client-transaction-portal:
-    image: ${IMAGE_REGISTRY}/client-transaction-portal:${VERSION}
-    container_name: client-transaction-portal
+  trader-order-entry:
+    image: ${IMAGE_REGISTRY}/trader-order-entry:${VERSION}
+    container_name: trader-order-entry
     build:
       context: ./
       dockerfile: ${FRONTEND_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/client-transaction-portal:${VERSION}
+        - ${IMAGE_REGISTRY}/trader-order-entry:${VERSION}
     deploy:
       resources:
         limits:
@@ -293,7 +293,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
       - ENV_PLATFORM
-      - OTEL_SERVICE_NAME=client-transaction-portal
+      - OTEL_SERVICE_NAME=trader-order-entry
       - PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - WEB_OTEL_SERVICE_NAME=frontend-web
@@ -303,36 +303,36 @@ services:
     depends_on:
       market-news:
         condition: service_started
-      transaction-staging:
+      order-staging:
         condition: service_started
-      payment-orchestration:
+      order-routing:
         condition: service_started
-      fx-rate:
+      fx-rates:
         condition: service_started
-      reference-data:
+      instrument-reference-data:
         condition: service_started
-      pricing-quote:
+      market-data-quotes:
         condition: service_started
-      ops-recommendation:
+      smart-order-recommendation:
         condition: service_started
-      settlement:
+      settlement-instructions:
         condition: service_started
       otel-collector:
         condition: service_started
-      document-imaging:
+      trade-documents:
         condition: service_started
       incident-control:
         condition: service_started
     logging: *logging
 
-  transaction-api-gateway:
-    image: ${IMAGE_REGISTRY}/transaction-api-gateway:${VERSION}
-    container_name: transaction-api-gateway
+  fix-api-gateway:
+    image: ${IMAGE_REGISTRY}/fix-api-gateway:${VERSION}
+    container_name: fix-api-gateway
     build:
       context: ./
       dockerfile: ${FRONTEND_PROXY_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/transaction-api-gateway:${VERSION}
+        - ${IMAGE_REGISTRY}/fix-api-gateway:${VERSION}
     deploy:
       resources:
         limits:
@@ -352,7 +352,7 @@ services:
       - OTEL_COLLECTOR_PORT_GRPC
       - OTEL_COLLECTOR_PORT_HTTP
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
-      - OTEL_SERVICE_NAME=transaction-api-gateway
+      - OTEL_SERVICE_NAME=fix-api-gateway
       - ENVOY_PORT
       - ENVOY_ADDR
       - ENVOY_ADMIN_PORT
@@ -369,20 +369,20 @@ services:
       - TELEMETRY_DOCS_HOST
       - TELEMETRY_DOCS_PORT
     depends_on:
-      client-transaction-portal:
+      trader-order-entry:
         condition: service_started
-      simulated-market-activity:
+      simulated-fix-order-flow:
         condition: service_started
     dns_search: ""
 
-  document-imaging:
-    image: ${IMAGE_REGISTRY}/document-imaging:${VERSION}
-    container_name: document-imaging
+  trade-documents:
+    image: ${IMAGE_REGISTRY}/trade-documents:${VERSION}
+    container_name: trade-documents
     build:
       context: ./
       dockerfile: ${IMAGE_PROVIDER_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/document-imaging:${VERSION}
+        - ${IMAGE_REGISTRY}/trade-documents:${VERSION}
     deploy:
       resources:
         limits:
@@ -395,20 +395,20 @@ services:
       - OTEL_COLLECTOR_HOST
       - OTEL_COLLECTOR_PORT_GRPC
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=document-imaging
+      - OTEL_SERVICE_NAME=trade-documents
     depends_on:
       otel-collector:
         condition: service_started
     logging: *logging
 
-  simulated-market-activity:
-    image: ${IMAGE_REGISTRY}/simulated-market-activity:${VERSION}
-    container_name: simulated-market-activity
+  simulated-fix-order-flow:
+    image: ${IMAGE_REGISTRY}/simulated-fix-order-flow:${VERSION}
+    container_name: simulated-fix-order-flow
     build:
       context: ./
       dockerfile: ${LOAD_GENERATOR_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/simulated-market-activity:${VERSION}
+        - ${IMAGE_REGISTRY}/simulated-fix-order-flow:${VERSION}
     deploy:
       resources:
         limits:
@@ -426,27 +426,27 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=simulated-market-activity
+      - OTEL_SERVICE_NAME=simulated-fix-order-flow
       - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
       - LOCUST_WEB_HOST=0.0.0.0
       - FLAGD_HOST
       - FLAGD_PORT
       - FLAGD_OFREP_PORT
     depends_on:
-      client-transaction-portal:
+      trader-order-entry:
         condition: service_started
       incident-control:
         condition: service_started
     logging: *logging
 
-  payment-gateway:
-    image: ${IMAGE_REGISTRY}/payment-gateway:${VERSION}
-    container_name: payment-gateway
+  execution-venue-adapter:
+    image: ${IMAGE_REGISTRY}/execution-venue-adapter:${VERSION}
+    container_name: execution-venue-adapter
     build:
       context: ./
       dockerfile: ${PAYMENT_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/payment-gateway:${VERSION}
+        - ${IMAGE_REGISTRY}/execution-venue-adapter:${VERSION}
     deploy:
       resources:
         limits:
@@ -462,7 +462,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
-      - OTEL_SERVICE_NAME=payment-gateway
+      - OTEL_SERVICE_NAME=execution-venue-adapter
     depends_on:
       otel-collector:
         condition: service_started
@@ -470,14 +470,14 @@ services:
         condition: service_started
     logging: *logging
 
-  reference-data:
-    image: ${IMAGE_REGISTRY}/reference-data:${VERSION}
-    container_name: reference-data
+  instrument-reference-data:
+    image: ${IMAGE_REGISTRY}/instrument-reference-data:${VERSION}
+    container_name: instrument-reference-data
     build:
       context: ./
       dockerfile: ${PRODUCT_CATALOG_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/reference-data:${VERSION}
+        - ${IMAGE_REGISTRY}/instrument-reference-data:${VERSION}
     deploy:
       resources:
         limits:
@@ -493,7 +493,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=high
-      - OTEL_SERVICE_NAME=reference-data
+      - OTEL_SERVICE_NAME=instrument-reference-data
       - OTEL_CONFIG_FILE=/otel-config.yml
       - OTEL_SEMCONV_STABILITY_OPT_IN=database
       - DB_CONNECTION_STRING=postgres://astronomy_user:${POSTGRES_ASTRONOMY_PASSWORD}@${POSTGRES_HOST}/astronomy_db?sslmode=disable
@@ -508,14 +508,14 @@ services:
       - ./otel-config.yml:/otel-config.yml
     logging: *logging
 
-  transaction-audit:
-    image: ${IMAGE_REGISTRY}/transaction-audit:${VERSION}
-    container_name: transaction-audit
+  trade-audit:
+    image: ${IMAGE_REGISTRY}/trade-audit:${VERSION}
+    container_name: trade-audit
     build:
       context: ./
       dockerfile: ${PRODUCT_REVIEWS_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/transaction-audit:${VERSION}
+        - ${IMAGE_REGISTRY}/trade-audit:${VERSION}
     deploy:
       resources:
         limits:
@@ -529,7 +529,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
-      - OTEL_SERVICE_NAME=transaction-audit
+      - OTEL_SERVICE_NAME=trade-audit
       - OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
       - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
       - DB_CONNECTION_STRING=host=${POSTGRES_HOST} user=astronomy_user password=${POSTGRES_ASTRONOMY_PASSWORD} dbname=astronomy_db
@@ -542,7 +542,7 @@ services:
       - LLM_HOST
       - LLM_PORT
     depends_on:
-      reference-data:
+      instrument-reference-data:
         condition: service_started
       llm:
         condition: service_started
@@ -552,14 +552,14 @@ services:
         condition: service_started
     logging: *logging
 
-  pricing-quote:
-    image: ${IMAGE_REGISTRY}/pricing-quote:${VERSION}
-    container_name: pricing-quote
+  market-data-quotes:
+    image: ${IMAGE_REGISTRY}/market-data-quotes:${VERSION}
+    container_name: market-data-quotes
     build:
       context: ./
       dockerfile: ${QUOTE_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/pricing-quote:${VERSION}
+        - ${IMAGE_REGISTRY}/market-data-quotes:${VERSION}
     deploy:
       resources:
         limits:
@@ -575,20 +575,20 @@ services:
       - QUOTE_PORT
       - OTEL_PHP_INTERNAL_METRICS_ENABLED=true
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=pricing-quote
+      - OTEL_SERVICE_NAME=market-data-quotes
     depends_on:
       otel-collector:
         condition: service_started
     logging: *logging
 
-  ops-recommendation:
-    image: ${IMAGE_REGISTRY}/ops-recommendation:${VERSION}
-    container_name: ops-recommendation
+  smart-order-recommendation:
+    image: ${IMAGE_REGISTRY}/smart-order-recommendation:${VERSION}
+    container_name: smart-order-recommendation
     build:
       context: ./
       dockerfile: ${RECOMMENDATION_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/ops-recommendation:${VERSION}
+        - ${IMAGE_REGISTRY}/smart-order-recommendation:${VERSION}
     deploy:
       resources:
         limits:
@@ -605,10 +605,10 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
-      - OTEL_SERVICE_NAME=ops-recommendation
+      - OTEL_SERVICE_NAME=smart-order-recommendation
       - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
     depends_on:
-      reference-data:
+      instrument-reference-data:
         condition: service_started
       otel-collector:
         condition: service_started
@@ -616,14 +616,14 @@ services:
         condition: service_started
     logging: *logging
 
-  settlement:
-    image: ${IMAGE_REGISTRY}/settlement:${VERSION}
-    container_name: settlement
+  settlement-instructions:
+    image: ${IMAGE_REGISTRY}/settlement-instructions:${VERSION}
+    container_name: settlement-instructions
     build:
       context: ./
       dockerfile: ${SHIPPING_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/settlement:${VERSION}
+        - ${IMAGE_REGISTRY}/settlement-instructions:${VERSION}
     deploy:
       resources:
         limits:
@@ -637,7 +637,7 @@ services:
       - QUOTE_ADDR
       - OTEL_EXPORTER_OTLP_ENDPOINT
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=high
-      - OTEL_SERVICE_NAME=settlement
+      - OTEL_SERVICE_NAME=settlement-instructions
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
     depends_on:
       otel-collector:
@@ -674,14 +674,14 @@ services:
       - ./src/flagd:/etc/flagd
     logging: *logging
 
-  transaction-event-stream:
-    image: ${IMAGE_REGISTRY}/transaction-event-stream:${VERSION}
-    container_name: transaction-event-stream
+  trade-event-stream:
+    image: ${IMAGE_REGISTRY}/trade-event-stream:${VERSION}
+    container_name: trade-event-stream
     build:
       context: ./
       dockerfile: ${KAFKA_DOCKERFILE}
       cache_from:
-        - ${IMAGE_REGISTRY}/transaction-event-stream:${VERSION}
+        - ${IMAGE_REGISTRY}/trade-event-stream:${VERSION}
       args:
         OTEL_JAVA_AGENT_VERSION: ${OTEL_JAVA_AGENT_VERSION}
     deploy:
@@ -696,10 +696,10 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=transaction-event-stream
+      - OTEL_SERVICE_NAME=trade-event-stream
       - KAFKA_HEAP_OPTS=-Xmx400m -Xms400m
     healthcheck:
-      test: nc -z transaction-event-stream 9092
+      test: nc -z trade-event-stream 9092
       start_period: 10s
       interval: 5s
       timeout: 10s

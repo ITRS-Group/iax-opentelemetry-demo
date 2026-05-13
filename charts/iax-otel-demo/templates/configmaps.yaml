@@ -1,0 +1,172 @@
+{{/* flagd feature-flag configuration */}}
+{{- if (index .Values.components "incident-control").enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: incident-control-flagd-config
+  labels:
+    {{- include "iax-otel-demo.labels" (dict "Chart" .Chart "Release" .Release "name" "incident-control") | nindent 4 }}
+data:
+  demo.flagd.json: |
+    {
+      "$schema": "https://flagd.dev/schema/v0/flags.json",
+      "flags": {
+        "llmInaccurateResponse": {
+          "defaultVariant": "off",
+          "description": "LLM returns an inaccurate product summary for product ID L9ECAV7KIM",
+          "state": "ENABLED",
+          "variants": { "off": false, "on": true }
+        },
+        "llmRateLimitError": {
+          "defaultVariant": "off",
+          "description": "LLM intermittently returns a rate limit error",
+          "state": "ENABLED",
+          "variants": { "off": false, "on": true }
+        },
+        "productCatalogFailure": {
+          "description": "Fail product catalog service on a specific product",
+          "state": "ENABLED",
+          "variants": { "on": true, "off": false },
+          "defaultVariant": "off"
+        },
+        "recommendationCacheFailure": {
+          "description": "Fail recommendation service cache",
+          "state": "ENABLED",
+          "variants": { "on": true, "off": false },
+          "defaultVariant": "off"
+        },
+        "adManualGc": {
+          "description": "Triggers full manual garbage collections in the ad service",
+          "state": "ENABLED",
+          "variants": { "on": true, "off": false },
+          "defaultVariant": "off"
+        },
+        "adHighCpu": {
+          "description": "Triggers high cpu load in the ad service",
+          "state": "ENABLED",
+          "variants": { "on": true, "off": false },
+          "defaultVariant": "off"
+        },
+        "adFailure": {
+          "description": "Fail ad service",
+          "state": "ENABLED",
+          "variants": { "on": true, "off": false },
+          "defaultVariant": "off"
+        },
+        "kafkaQueueProblems": {
+          "description": "Overloads Kafka queue while simultaneously introducing a consumer side delay leading to a lag spike",
+          "state": "ENABLED",
+          "variants": { "on": 100, "off": 0 },
+          "defaultVariant": "off"
+        },
+        "cartFailure": {
+          "description": "Fail cart service",
+          "state": "ENABLED",
+          "variants": { "on": true, "off": false },
+          "defaultVariant": "off"
+        },
+        "paymentFailure": {
+          "description": "Fail payment service charge requests n%",
+          "state": "ENABLED",
+          "variants": { "100%": 1, "90%": 0.95, "75%": 0.75, "50%": 0.5, "25%": 0.25, "10%": 0.1, "off": 0 },
+          "defaultVariant": "off"
+        },
+        "paymentUnreachable": {
+          "description": "Payment service is unavailable",
+          "state": "ENABLED",
+          "variants": { "on": true, "off": false },
+          "defaultVariant": "off"
+        },
+        "loadGeneratorFloodHomepage": {
+          "description": "Flood the frontend with a large amount of requests.",
+          "state": "ENABLED",
+          "variants": { "on": 100, "off": 0 },
+          "defaultVariant": "off"
+        },
+        "imageSlowLoad": {
+          "description": "slow loading images in the frontend",
+          "state": "ENABLED",
+          "variants": { "10sec": 10000, "5sec": 5000, "off": 0 },
+          "defaultVariant": "off"
+        },
+        "failedReadinessProbe": {
+          "description": "readiness probe failure for cart service",
+          "state": "ENABLED",
+          "variants": { "on": true, "off": false },
+          "defaultVariant": "off"
+        },
+        "emailMemoryLeak": {
+          "description": "Memory leak in the email service.",
+          "state": "ENABLED",
+          "variants": { "off": 0, "1x": 1, "10x": 10, "100x": 100, "1000x": 1000, "10000x": 10000 },
+          "defaultVariant": "off"
+        }
+      }
+    }
+{{- end }}
+
+{{/* PostgreSQL initialization SQL */}}
+{{- if (index .Values.components "astronomy-db").enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: astronomy-db-postgresql-init
+  labels:
+    {{- include "iax-otel-demo.labels" (dict "Chart" .Chart "Release" .Release "name" "astronomy-db") | nindent 4 }}
+data:
+  init.sql: |
+    CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+    CREATE USER astronomy_user WITH PASSWORD 'astronomy_password';
+    CREATE DATABASE astronomy_db OWNER astronomy_user;
+    CREATE USER monitoring_user WITH PASSWORD 'monitoring_password';
+    GRANT pg_monitor TO monitoring_user;
+    \connect astronomy_db
+    CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+    CREATE SCHEMA accounting;
+    GRANT USAGE ON SCHEMA accounting TO astronomy_user;
+    CREATE TABLE accounting."order" (order_id TEXT PRIMARY KEY);
+    CREATE TABLE accounting.shipping (
+        shipping_tracking_id TEXT PRIMARY KEY,
+        shipping_cost_currency_code TEXT NOT NULL,
+        shipping_cost_units BIGINT NOT NULL,
+        shipping_cost_nanos INT NOT NULL,
+        street_address TEXT, city TEXT, state TEXT, country TEXT, zip_code TEXT,
+        order_id TEXT NOT NULL,
+        FOREIGN KEY (order_id) REFERENCES accounting."order"(order_id) ON DELETE CASCADE
+    );
+    CREATE TABLE accounting.orderitem (
+        item_cost_currency_code TEXT NOT NULL,
+        item_cost_units BIGINT NOT NULL,
+        item_cost_nanos INT NOT NULL,
+        product_id TEXT NOT NULL,
+        quantity INT NOT NULL,
+        order_id TEXT NOT NULL,
+        PRIMARY KEY (order_id, product_id),
+        FOREIGN KEY (order_id) REFERENCES accounting."order"(order_id) ON DELETE CASCADE
+    );
+    GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA accounting TO astronomy_user;
+
+    CREATE SCHEMA reviews;
+    GRANT USAGE ON SCHEMA reviews TO astronomy_user;
+    CREATE TABLE reviews.productreviews (
+        id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        product_id VARCHAR(16) NOT NULL,
+        username VARCHAR(64) NOT NULL,
+        description VARCHAR(1024),
+        score NUMERIC(2,1) NOT NULL
+    );
+    CREATE INDEX product_id_index ON reviews.productreviews (product_id);
+    GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA reviews TO astronomy_user;
+
+    CREATE SCHEMA catalog;
+    GRANT USAGE ON SCHEMA catalog TO astronomy_user;
+    CREATE TABLE catalog.products (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, picture TEXT,
+        price_currency_code TEXT NOT NULL, price_units BIGINT NOT NULL,
+        price_nanos INT NOT NULL, categories TEXT
+    );
+    GRANT SELECT ON ALL TABLES IN SCHEMA catalog TO astronomy_user;
+{{- end }}
