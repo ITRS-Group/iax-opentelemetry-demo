@@ -468,7 +468,7 @@ components:
       port: 3550
     resources:
       limits:
-        memory: 20Mi
+        memory: 100Mi
     env:
       - name: OTEL_SERVICE_NAME
         value: instrument-reference-data
