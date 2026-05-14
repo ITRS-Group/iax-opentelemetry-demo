@@ -644,6 +644,33 @@ components:
       - name: OTEL_SERVICE_NAME
         value: incident-control
 
+  # -- incident-control-ui (Elixir/Phoenix) — flagd feature-flag configurator UI
+  incident-control-ui:
+    enabled: true
+    useDefault:
+      env: true
+    service:
+      port: 4000
+    resources:
+      limits:
+        memory: 200Mi
+    mountedConfigMaps:
+      - name: flagd-config
+        mountPath: /app/data
+    env:
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
+      - name: OTEL_SERVICE_NAME
+        value: incident-control-ui
+      - name: FLAGD_UI_PORT
+        value: "4000"
+      - name: SECRET_KEY_BASE
+        value: "yYrECL4qbNwleYInGJYvVnSkwJuSQJ4ijPTx5tirGUXrbznFIBFVJdPl5t6O9ASw"
+      - name: PHX_HOST
+        value: "localhost"
+      - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
+        value: "service.criticality=low"
+
   # -- trade-event-stream — Kafka broker
   trade-event-stream:
     enabled: true

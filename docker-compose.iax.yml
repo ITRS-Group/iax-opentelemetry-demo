@@ -674,6 +674,38 @@ services:
       - ./src/flagd:/etc/flagd
     logging: *logging
 
+  incident-control-ui:
+    image: ${IMAGE_REGISTRY}/incident-control-ui:${VERSION}
+    container_name: incident-control-ui
+    build:
+      context: ./
+      dockerfile: ${FLAGD_UI_DOCKERFILE}
+      cache_from:
+        - ${IMAGE_REGISTRY}/incident-control-ui:${VERSION}
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+    restart: unless-stopped
+    environment:
+      - FLAGD_UI_PORT
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
+      - OTEL_SERVICE_NAME=incident-control-ui
+      - SECRET_KEY_BASE=yYrECL4qbNwleYInGJYvVnSkwJuSQJ4ijPTx5tirGUXrbznFIBFVJdPl5t6O9ASw
+      - PHX_HOST=localhost
+    ports:
+      - "${FLAGD_UI_PORT}"
+    depends_on:
+      otel-collector:
+        condition: service_started
+      incident-control:
+        condition: service_started
+    volumes:
+      - ./src/flagd:/app/data
+    logging: *logging
+
   trade-event-stream:
     image: ${IMAGE_REGISTRY}/trade-event-stream:${VERSION}
     container_name: trade-event-stream

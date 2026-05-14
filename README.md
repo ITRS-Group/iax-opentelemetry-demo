@@ -82,6 +82,7 @@ without `Unauthenticated` or `connection refused` errors.
 | -------------------------------- | --------------------------------------------------- |
 | `http://localhost:8080`          | Storefront — browse products, add to cart, checkout |
 | `http://localhost:8080/loadgen/` | Load generator UI — adjust synthetic traffic volume |
+| `http://localhost:8080/feature`  | Feature flag configurator — toggle fault injection scenarios |
 
 
 The load generator starts automatically, so traces, metrics, and logs flow
@@ -205,7 +206,7 @@ forwards everything to IAX.
 ### Option 4: Deploy to Kubernetes with Helm
 
 A standalone Helm chart is included at `charts/iax-otel-demo/`. It deploys
-all demo microservices, infrastructure (PostgreSQL, Valkey, Kafka, flagd),
+all demo microservices, infrastructure (PostgreSQL, Valkey, Kafka, flagd, flagd UI),
 and an OTel Collector pre-configured to export to IAX.
 
 **Install:**
@@ -232,18 +233,32 @@ helm install iax-demo ./charts/iax-otel-demo/ \
   --set 'global.imagePullSecrets[0].name=nexus-pull'
 ```
 
-**With an existing Secret for IAX credentials:**
+**Recommended: dedicated namespace with pre-created Secrets (cloud-managed clusters):**
+
+This keeps credentials out of Helm release history and isolates the demo
+from other workloads.
 
 ```bash
+kubectl create namespace iax-otel-demo
+
+kubectl create secret docker-registry nexus-pull \
+  --docker-server=docker.itrsgroup.com \
+  --docker-username=your-user \
+  --docker-password=your-pass \
+  -n iax-otel-demo
+
 kubectl create secret generic my-iax-creds \
   --from-literal=IAX_OTLP_ENDPOINT=your-iax-host:443 \
   --from-literal=IAX_OTLP_INSECURE=false \
   --from-literal=IAX_OTLP_INSECURE_SKIP_VERIFY=false \
   --from-literal=IAX_INGESTION_USERNAME=your-username \
-  --from-literal=IAX_INGESTION_PASSWORD=your-password
+  --from-literal=IAX_INGESTION_PASSWORD=your-password \
+  -n iax-otel-demo
 
 helm install iax-demo ./charts/iax-otel-demo/ \
-  --set iax.existingSecret=my-iax-creds
+  -n iax-otel-demo \
+  --set iax.existingSecret=my-iax-creds \
+  --set 'global.imagePullSecrets[0].name=nexus-pull'
 ```
 
 **Enable Ingress:**
@@ -264,21 +279,24 @@ helm install iax-demo ./charts/iax-otel-demo/ \
 **Verify:**
 
 ```bash
-kubectl get pods -l opentelemetry.io/name
-kubectl logs deploy/iax-demo-otel-collector --tail 20
+kubectl get pods -l opentelemetry.io/name -n iax-otel-demo
+kubectl logs deploy/iax-demo-otel-collector --tail 20 -n iax-otel-demo
 ```
 
 **Access the demo** (without Ingress):
 
 ```bash
-kubectl port-forward svc/fix-api-gateway 9090:8080 --address=0.0.0.0
-# Open http://<cluster-host>:9090
+kubectl port-forward svc/fix-api-gateway 9090:8080 --address=0.0.0.0 -n iax-otel-demo
+# Storefront:        http://<cluster-host>:9090
+# Load generator:    http://<cluster-host>:9090/loadgen/
+# Feature flags:     http://<cluster-host>:9090/feature
 ```
 
 **Uninstall:**
 
 ```bash
-helm uninstall iax-demo
+helm uninstall iax-demo -n iax-otel-demo
+kubectl delete namespace iax-otel-demo
 ```
 
 **Helm values reference:**
@@ -523,6 +541,7 @@ All data is tagged with `service.namespace=iax-otel-demo` for easy filtering in 
 | market-data-quotes         | PHP           | Traces, Metrics       |
 | smart-order-recommendation | Python        | Traces, Metrics, Logs |
 | settlement-instructions    | Rust          | Traces, Metrics       |
+| incident-control-ui        | Elixir        | Traces, Metrics       |
 
 
 ## What to Expect in IAX
