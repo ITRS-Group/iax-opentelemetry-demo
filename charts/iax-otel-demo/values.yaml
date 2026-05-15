@@ -38,7 +38,7 @@ otelCollector:
   replicas: 1
   resources:
     limits:
-      memory: 200Mi
+      memory: 512Mi
   ports:
     grpc: 4317
     http: 4318

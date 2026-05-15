@@ -65,7 +65,7 @@ spec:
             - name: POSTGRES_MONITORING_PASSWORD
               value: "monitoring_password"
             - name: GOMEMLIMIT
-              value: "160MiB"
+              value: "400MiB"
             - name: IAX_OTLP_ENDPOINT
               valueFrom:
                 secretKeyRef:
