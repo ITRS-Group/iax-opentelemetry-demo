@@ -653,7 +653,7 @@ components:
       port: 4000
     resources:
       limits:
-        memory: 200Mi
+        memory: 400Mi
     mountedConfigMaps:
       - name: flagd-config
         mountPath: /app/data
