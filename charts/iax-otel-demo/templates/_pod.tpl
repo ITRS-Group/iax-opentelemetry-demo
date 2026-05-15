@@ -21,6 +21,17 @@ Build the merged env var list for a component pod.
 
 {{- if or .env .envOverrides }}
 {{-   $localEnvs := include "iax-otel-demo.envOverridden" . | mustFromJson }}
+{{-   $localNames := dict }}
+{{-   range $localEnvs }}
+{{-     $_ := set $localNames .name true }}
+{{-   end }}
+{{-   $dedupedEnvs := list }}
+{{-   range $allEnvs }}
+{{-     if not (hasKey $localNames .name) }}
+{{-       $dedupedEnvs = append $dedupedEnvs . }}
+{{-     end }}
+{{-   end }}
+{{-   $allEnvs = $dedupedEnvs }}
 {{-   range $localEnvs }}
 {{-     if eq .name "OTEL_RESOURCE_ATTRIBUTES" }}
 {{-       $resourceAttributesEnv = . }}

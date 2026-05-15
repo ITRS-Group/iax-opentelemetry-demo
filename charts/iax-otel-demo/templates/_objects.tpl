@@ -95,7 +95,7 @@ spec:
         {{- range .mountedConfigMaps }}
         - name: {{ .name | lower }}
           configMap:
-            name: {{ $.name }}-{{ .name | lower }}
+            name: {{ .configMapName | default (printf "%s-%s" $.name (.name | lower)) }}
         {{- end }}
 {{- end }}
 

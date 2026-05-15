@@ -324,7 +324,7 @@ components:
         value: 10000
     resources:
       limits:
-        memory: 65Mi
+        memory: 200Mi
     env:
       - name: OTEL_SERVICE_NAME
         value: fix-api-gateway
@@ -657,6 +657,7 @@ components:
     mountedConfigMaps:
       - name: flagd-config
         mountPath: /app/data
+        configMapName: incident-control-flagd-config
     env:
       - name: OTEL_EXPORTER_OTLP_ENDPOINT
         value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
