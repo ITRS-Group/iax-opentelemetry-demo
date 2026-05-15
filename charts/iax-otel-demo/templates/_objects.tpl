@@ -49,6 +49,10 @@ spec:
       securityContext:
         {{- .podSecurityContext | default .defaultValues.podSecurityContext | toYaml | nindent 8 }}
       {{- end }}
+      {{- if .initContainers }}
+      initContainers:
+        {{- toYaml .initContainers | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .name }}
           image: {{ include "iax-otel-demo.image" . }}
@@ -91,11 +95,19 @@ spec:
               subPath: {{ .subPath }}
               {{- end }}
           {{- end }}
+      {{- if .sidecars }}
+        {{- tpl (toYaml .sidecars) . | nindent 8 }}
+      {{- end }}
       volumes:
         {{- range .mountedConfigMaps }}
+        {{- if .writable }}
+        - name: {{ .name | lower }}
+          emptyDir: {}
+        {{- else }}
         - name: {{ .name | lower }}
           configMap:
             name: {{ .configMapName | default (printf "%s-%s" $.name (.name | lower)) }}
+        {{- end }}
         {{- end }}
 {{- end }}
 

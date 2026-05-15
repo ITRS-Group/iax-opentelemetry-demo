@@ -365,7 +365,7 @@ components:
       - name: JAEGER_HOST
         value: jaeger
       - name: FLAGD_UI_HOST
-        value: incident-control-ui
+        value: incident-control
       - name: FLAGD_UI_PORT
         value: "4000"
       - name: TELEMETRY_DOCS_HOST
@@ -609,7 +609,9 @@ components:
 # Infrastructure services
 # ---------------------------------------------------------------------------
 
-  # -- incident-control — flagd feature-flag service
+  # -- incident-control — flagd feature-flag service + flagd-ui sidecar
+  # flagd and flagd-ui share a writable emptyDir volume so the UI can
+  # persist flag changes that flagd picks up via file-watch.
   incident-control:
     enabled: true
     useDefault:
@@ -622,6 +624,8 @@ components:
         value: 8013
       - name: ofrep
         value: 8016
+      - name: flagd-ui
+        value: 4000
     resources:
       limits:
         memory: 75Mi
@@ -629,9 +633,50 @@ components:
       - start
       - --uri
       - file:./etc/flagd/demo.flagd.json
+    initContainers:
+      - name: copy-flagd-config
+        image: busybox:1.37
+        command: ["sh", "-c", "cp /src/* /dest/"]
+        volumeMounts:
+          - name: flagd-config-ro
+            mountPath: /src
+          - name: flagd-config
+            mountPath: /dest
     mountedConfigMaps:
+      - name: flagd-config-ro
+        mountPath: /unused
+        configMapName: incident-control-flagd-config
       - name: flagd-config
         mountPath: /etc/flagd
+        writable: true
+    sidecars:
+      - name: incident-control-ui
+        image: '{{ .defaultValues.image.repository }}/incident-control-ui:{{ .defaultValues.image.tag }}'
+        imagePullPolicy: '{{ .defaultValues.image.pullPolicy }}'
+        ports:
+          - containerPort: 4000
+            name: flagd-ui
+        env:
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
+          - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+            value: cumulative
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: "service.namespace=iax-otel-demo,service.version=1.0.3,service.criticality=low"
+          - name: OTEL_SERVICE_NAME
+            value: incident-control-ui
+          - name: FLAGD_UI_PORT
+            value: "4000"
+          - name: SECRET_KEY_BASE
+            value: "yYrECL4qbNwleYInGJYvVnSkwJuSQJ4ijPTx5tirGUXrbznFIBFVJdPl5t6O9ASw"
+          - name: PHX_HOST
+            value: "localhost"
+        resources:
+          limits:
+            memory: 400Mi
+        volumeMounts:
+          - name: flagd-config
+            mountPath: /app/data
     env:
       - name: FLAGD_OTEL_COLLECTOR_URI
         value: '{{ include "iax-otel-demo.name" . }}-otel-collector:4317'
@@ -644,33 +689,10 @@ components:
       - name: OTEL_SERVICE_NAME
         value: incident-control
 
-  # -- incident-control-ui (Elixir/Phoenix) — flagd feature-flag configurator UI
+  # -- incident-control-ui — now runs as a sidecar in the incident-control pod
+  # so flagd and flagd-ui share a writable volume for flag persistence.
   incident-control-ui:
-    enabled: true
-    useDefault:
-      env: true
-    service:
-      port: 4000
-    resources:
-      limits:
-        memory: 400Mi
-    mountedConfigMaps:
-      - name: flagd-config
-        mountPath: /app/data
-        configMapName: incident-control-flagd-config
-    env:
-      - name: OTEL_EXPORTER_OTLP_ENDPOINT
-        value: 'http://{{ include "iax-otel-demo.name" . }}-otel-collector:4318'
-      - name: OTEL_SERVICE_NAME
-        value: incident-control-ui
-      - name: FLAGD_UI_PORT
-        value: "4000"
-      - name: SECRET_KEY_BASE
-        value: "yYrECL4qbNwleYInGJYvVnSkwJuSQJ4ijPTx5tirGUXrbznFIBFVJdPl5t6O9ASw"
-      - name: PHX_HOST
-        value: "localhost"
-      - name: OTEL_RESOURCE_ATTRIBUTES_EXTRA
-        value: "service.criticality=low"
+    enabled: false
 
   # -- trade-event-stream — Kafka broker
   trade-event-stream:
